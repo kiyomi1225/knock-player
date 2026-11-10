@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>筆算ノック プレーヤー</title>
+<style>
+/* 筆算ノックの「再生チケット」専用プレーヤー。1本だけ流して、終わったら「おしまい」。
+   動画の上を透明なカバーでふさぎ、YouTube のロゴ・タイトル・おすすめには触れられないようにする。 */
+:root{--bg:#0f1a44;--panel:#16245e;--ink:#ffffff;--muted:#b9c4e6;--accent:#f06ab5;--ok:#4cc43a;
+  --rainbow:linear-gradient(90deg,#f5c400,#4cc43a,#2fa7e8,#8a4fd6,#f06ab5,#e53935);
+  --font:"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+.wrap{min-height:100%;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+h1{margin:0;font-size:clamp(16px,3.6vw,22px);text-align:center;max-width:900px;line-height:1.4}
+.stage{position:relative;width:min(960px,100%);aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#000;box-shadow:0 0 0 4px #ffcc2e,0 10px 40px rgba(0,0,0,.5)}
+#player,#player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.cover{position:absolute;inset:0;z-index:2;background:transparent}
+.bar{display:flex;align-items:center;gap:14px;width:min(960px,100%)}
+.btn{font:inherit;font-weight:700;font-size:20px;border:0;border-radius:16px;padding:14px 26px;background:#fff;color:#1c2a44;min-height:56px;cursor:pointer;box-shadow:0 4px 0 rgba(0,0,0,.25)}
+.btn:active{transform:translateY(2px);box-shadow:0 2px 0 rgba(0,0,0,.25)}
+.btn.big{font-size:26px;padding:18px 40px;background:var(--accent);color:#fff}
+.prog{flex:1;height:12px;border-radius:999px;background:rgba(255,255,255,.18);overflow:hidden}
+.prog i{display:block;height:100%;width:0;background:var(--rainbow)}
+.time{font-variant-numeric:tabular-nums;color:var(--muted);font-size:15px;min-width:5.5em;text-align:right}
+.msg{position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:rgba(15,26,68,.92);text-align:center;padding:16px;box-sizing:border-box}
+.msg b{font-size:clamp(26px,5vw,40px);background:var(--rainbow);-webkit-background-clip:text;background-clip:text;color:transparent}
+.msg p{margin:0;color:var(--muted);font-size:16px;line-height:1.6}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="title">推しの動画</h1>
+  <div class="stage">
+    <div id="player"></div>
+    <div class="cover" id="cover"></div>
+    <div class="msg" id="start"><b>再生チケット 1枚</b><p>ボタンを押すと始まるよ</p><button class="btn big" id="go">▶ 再生する</button></div>
+    <div class="msg" id="done" hidden><b>おしまい！</b><p>このタブを閉じて、筆算ノックに戻ろう。<br>次のチケットは 30問 解くともらえるよ。</p><button class="btn" id="close">タブを閉じる</button></div>
+    <div class="msg" id="err" hidden><b>再生できなかった</b><p id="errText">この動画はここでは流せないみたい。<br>筆算ノックに戻って「もう一度ひらく」か、ほかの動画を選んでね。</p><button class="btn" id="close2">タブを閉じる</button></div>
+  </div>
+  <div class="bar" id="bar" hidden>
+    <button class="btn" id="pp">⏸ 一時停止</button>
+    <div class="prog"><i id="progI"></i></div>
+    <span class="time" id="time">0:00 / 0:00</span>
+  </div>
+</div>
+<script>
+(function(){
+  'use strict';
+  var q=new URLSearchParams(location.search), vid=q.get('v')||'', title=(q.get('t')||'').slice(0,120);
+  var $=function(id){ return document.getElementById(id); };
+  if(title) $('title').textContent=title;
+  function fmt(s){ s=Math.max(0,Math.floor(s||0)); return Math.floor(s/60)+':'+('0'+(s%60)).slice(-2); }
+  function show(id){ ['start','done','err'].forEach(function(x){ $(x).hidden = x!==id; }); }
+  function closeTab(){ window.close(); setTimeout(function(){ $('done').querySelector('p').innerHTML='ブラウザのタブを閉じて、筆算ノックに戻ってね。'; }, 300); }
+  $('close').onclick=closeTab; $('close2').onclick=closeTab;
+  if(!/^[\w-]{11}$/.test(vid)){ show('err'); $('errText').textContent='動画が指定されていない。筆算ノックから開いてね。'; return; }
+
+  var player=null, ready=false, timer=null, wantPlay=false;
+  window.onYouTubeIframeAPIReady=function(){
+    player=new YT.Player('player', {
+      host:'https://www.youtube-nocookie.com', videoId:vid,
+      playerVars:{controls:0, rel:0, modestbranding:1, playsinline:1, disablekb:1, fs:0, iv_load_policy:3, cc_load_policy:0},
+      events:{
+        onReady:function(){ ready=true; if(wantPlay) player.playVideo(); },
+        onStateChange:function(e){
+          if(e.data===YT.PlayerState.PLAYING){ $('pp').textContent='⏸ 一時停止'; $('bar').hidden=false; tick(); }
+          if(e.data===YT.PlayerState.PAUSED){ $('pp').textContent='▶ 再生'; }
+          if(e.data===YT.PlayerState.ENDED){ finish(); }
+        },
+        onError:function(e){ clearInterval(timer); show('err'); $('bar').hidden=true; try{ player.destroy(); }catch(x){} }
+      }
+    });
+  };
+  function tick(){ clearInterval(timer); timer=setInterval(function(){ if(!player||!player.getDuration) return; var d=player.getDuration(), c=player.getCurrentTime();
+    $('progI').style.width=(d?c/d*100:0)+'%'; $('time').textContent=fmt(c)+' / '+fmt(d); if(d && c>=d-0.4) finish(); }, 250); }
+  var finished=false;
+  function finish(){ if(finished) return; finished=true; clearInterval(timer); try{ player.stopVideo(); player.destroy(); }catch(x){} $('bar').hidden=true; show('done'); }
+  $('go').onclick=function(){ show(null); wantPlay=true; if(ready) player.playVideo(); };
+  $('pp').onclick=function(){ if(!player) return; var st=player.getPlayerState(); if(st===YT.PlayerState.PLAYING) player.pauseVideo(); else player.playVideo(); };
+  var s=document.createElement('script'); s.src='https://www.youtube.com/iframe_api'; document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
