@@ -68,7 +68,7 @@ h1{margin:0;font-size:clamp(16px,3.6vw,22px);text-align:center;max-width:900px;l
       events:{
         onReady:function(){ ready=true; if(wantPlay) player.playVideo(); },
         onStateChange:function(e){
-          if(e.data===YT.PlayerState.PLAYING){ $('pp').textContent='⏸ 一時停止'; $('bar').hidden=false; tick(); }
+          if(e.data===YT.PlayerState.PLAYING){ try{ player.unloadModule('captions'); player.unloadModule('cc'); }catch(x){} $('pp').textContent='⏸ 一時停止'; $('bar').hidden=false; tick(); }
           if(e.data===YT.PlayerState.PAUSED){ $('pp').textContent='▶ 再生'; }
           if(e.data===YT.PlayerState.ENDED){ finish(); }
         },
