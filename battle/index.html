@@ -92,9 +92,15 @@ details[open] summary{margin-bottom:10px}
 .pl .rd{font-size:12px;font-weight:800;padding:1px 10px;border-radius:999px;background:var(--ok);color:#fff}
 .pl.empty{border-style:dashed;color:var(--on-dark-muted)}
 .vsT{font-family:var(--font-talk);font-size:26px}
-.stamps{display:flex;gap:8px;justify-content:center}
-.stamps button{width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.14);font-size:26px}
-.stampFly{position:fixed;z-index:95;font-size:64px;pointer-events:none;left:50%;top:40%;animation:stamp 1.6s ease forwards}
+.stamps{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;max-width:480px;margin:0 auto}
+.stamps button{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.14);font-size:24px;transition:transform .1s}
+.stamps button:active{transform:scale(.9)}
+.stamps button.w{width:auto;height:40px;padding:0 14px;border-radius:999px;font-size:15px;font-weight:800;font-family:var(--font-talk)}
+.card .stamps button{background:#f1f4f9;color:var(--ink)}
+.stamps.cool button{opacity:.5}
+.stampFly{position:fixed;z-index:95;font-size:64px;pointer-events:none;left:50%;top:40%;animation:stamp 1.6s ease forwards;white-space:nowrap}
+.stampFly.txt{font-family:var(--font-talk);font-size:clamp(30px,8vmin,44px);background:#fff;color:var(--ink);padding:6px 22px;border-radius:999px;box-shadow:var(--shadow);border:4px solid var(--c,#ffd84d)}
+.stampFly small{display:block;font:700 12px var(--font-ui);color:var(--muted);text-align:center}
 @keyframes stamp{0%{transform:translate(-50%,0) scale(.3);opacity:0}20%{transform:translate(-50%,-20px) scale(1.2);opacity:1}80%{opacity:1}100%{transform:translate(-50%,-120px) scale(1);opacity:0}}
 .hc{font-size:13px;text-align:center;color:#ffd84d}
 
@@ -349,7 +355,9 @@ var OPNAME={add:'たし算', sub:'ひき算', mix:'ミックス', mul:'かけ算
 var LVNAME={2:'ふつう', 3:'むずかしい'};
 var SIGN={add:'+', sub:'−', mul:'×', div:'÷'};
 var PLACE=['一の位','十の位','百の位','千の位','一万の位','十万の位'];
-var STAMPS=['👏','😆','😭','🔥'];
+var STAMPS=['👏','😆','😭','🔥','😎','🤯','💪','🎉'];
+var WORDS=['ナイス！','おしい！','まだまだ！','つよすぎ…','もう1回！','よろしく！'];
+var stampAt=0;
 var BASE=location.origin+location.pathname;
 var JANKEN_SEC=10;
 
@@ -384,7 +392,22 @@ function openOv(html){ $('ov').innerHTML='<div class="overlay"><div class="card"
 function closeOv(){ $('ov').innerHTML=''; }
 function toast(t){ var e=$('toast'); e.textContent=t; e.classList.remove('show'); void e.offsetWidth; e.classList.add('show'); }
 function banner(t){ var b=$('banner'); if(!t){ b.hidden=true; return; } b.textContent=t; b.hidden=false; }
-function stampFly(e){ var d=document.createElement('div'); d.className='stampFly'; d.textContent=e; document.body.appendChild(d); setTimeout(function(){ d.remove(); }, 1700); }
+function isStamp(e){ return STAMPS.indexOf(e)>=0 || WORDS.indexOf(e)>=0; }
+function stampBtns(){ return STAMPS.map(function(s){ return '<button data-s="'+s+'">'+s+'</button>'; }).join('')+WORDS.map(function(s){ return '<button class="w" data-s="'+s+'">'+s+'</button>'; }).join(''); }
+/** スタンプを出す。from があれば「だれから」を小さく添えて、その人の色のふちにする */
+function stampFly(e, from){
+  var d=document.createElement('div'), w=WORDS.indexOf(e)>=0;
+  d.className='stampFly'+(w?' txt':''); d.textContent=e;
+  if(from){ var sm=document.createElement('small'); sm.textContent=from.nm; d.appendChild(sm); d.style.setProperty('--c', teamOf(from.m).color); }
+  d.style.left=(35+Math.random()*30)+'%';
+  document.body.appendChild(d); setTimeout(function(){ d.remove(); }, 1700);
+}
+/** 連打しすぎないように 0.8秒あける */
+function sendStamp(e, box){
+  if(!R || !isStamp(e) || Date.now()-stampAt<800) return;
+  stampAt=Date.now(); R.net.send({t:'st', e:e}); stampFly(e);
+  if(box){ box.classList.add('cool'); setTimeout(function(){ box.classList.remove('cool'); }, 800); }
+}
 function confetti(colors){
   if(reduced) return; var cv=$('confetti'), g=cv.getContext('2d'), W=cv.width=innerWidth, H=cv.height=innerHeight, ps=[];
   for(var i=0;i<120;i++) ps.push({x:Math.random()*W, y:-20-Math.random()*H*.4, vx:(Math.random()-.5)*3, vy:2+Math.random()*3, r:Math.random()*6.3, c:colors[i%colors.length], s:5+Math.random()*6});
@@ -469,10 +492,10 @@ function renderRoom(){
   if(R.host) cfgPicker($('roomCfg'), R.cfg, function(c){ R.cfg={op:c.op,dec:c.dec,lv:c.lv}; REC.cfg=Object.assign({}, R.cfg); saveRec(); sendRoom(); });
   else { $('roomCfg').onclick=null; $('roomCfg').innerHTML='<span class="status">'+(R.peer?'問題: '+cfgLabel(R.cfg)+'（へやを作った人が決める）':'')+'</span>'; }
   var rb=$('readyBtn'); rb.disabled=!R.peer; rb.textContent = R.meReady ? (R.peerReady ? 'はじまるよ！' : '相手を待っています…') : 'じゅんびOK！';
-  $('roomStamps').innerHTML = R.peer ? STAMPS.map(function(s){ return '<button data-s="'+s+'">'+s+'</button>'; }).join('') : '';
+  $('roomStamps').innerHTML = R.peer ? stampBtns() : '';
 }
 $('banner').addEventListener('click', function(){ if($('banner').textContent.indexOf('タップ')>=0){ banner(''); toLobby(); } });
-$('roomStamps').addEventListener('click', function(ev){ var b=ev.target.closest('button'); if(!b||!R) return; R.net.send({t:'st', e:b.dataset.s}); stampFly(b.dataset.s); });
+$('roomStamps').addEventListener('click', function(ev){ var b=ev.target.closest('button'); if(b) sendStamp(b.dataset.s, $('roomStamps')); });
 $('readyBtn').addEventListener('click', function(){ if(!R||!R.peer) return; R.meReady=!R.meReady; R.net.send({t:'ready', r:R.meReady}); renderRoom(); maybeStart(); });
 $('leaveRoom').addEventListener('click', function(){ closeRoom(); show('lobby'); renderLobby(); });
 $('shareRoom').addEventListener('click', function(){ if(R) share(BASE+'#room='+R.code, '筆算バトルしよう！ へやの番号は '+R.code); });
@@ -508,7 +531,7 @@ function onMsg(m){
     case 'prog': if(g && m.g===g.cfg.seed){ g.oppProg[m.r]=Math.max(g.oppProg[m.r]||0, Number(m.v)||0); } break;
     case 'miss': if(g && m.g===g.cfg.seed){ laneMiss('laneOpp'); } break;
     case 'rend': if(g && m.g===g.cfg.seed && Array.isArray(m.sp) && m.sp.length===3){ g.opd.sp[m.r]=m.sp.map(Number); g.oppProg[m.r]=3; checkRoundEnd(); } break;
-    case 'st': if(STAMPS.indexOf(m.e)>=0) stampFly(m.e); break;
+    case 'st': if(isStamp(m.e)) stampFly(m.e, R.peer); break;
     case 'bye': R.peer=null; R.peerReady=false; banner((g && !g.done) ? '相手がぬけました' : ''); if(g && !g.done){ G=null; stopPlay(); closeOv(); show('room'); } renderRoom(); break;
   }
 }
@@ -673,14 +696,14 @@ function roundResult(x){
       '<tr><td>あなた</td><td>'+L.HAND_ICON[x.ha]+'</td><td>'+(x.delayA?'+'+sec(x.delayA):'-')+'</td><td>'+sec(G.my.sp[r][2])+'</td><td class="'+(win?'w':'')+'">'+sec(x.timeA)+'</td></tr>'+
       '<tr><td>'+esc(G.opp.nm)+'</td><td>'+L.HAND_ICON[x.hb]+'</td><td>'+(x.delayB?'+'+sec(x.delayB):'-')+'</td><td>'+sec(G.opd.sp[r][2])+'</td><td class="'+(lose?'w':'')+'">'+sec(x.timeB)+'</td></tr></table>'+
       '<div class="bigScore"><span class="m">'+G.pts.me+'</span> - <span class="o">'+G.pts.opp+'</span></div>'+
-      (G.kind==='live'?'<div class="stamps" id="ovStamps">'+STAMPS.map(function(s){ return '<button data-s="'+s+'">'+s+'</button>'; }).join('')+'</div>':'')+
+      (G.kind==='live'?'<div class="stamps" id="ovStamps">'+stampBtns()+'</div>':'')+
       '<div class="btns"><button class="btn" id="nextR">'+(last?'結果へ':'次のラウンドへ')+'</button></div>');
     if(win) beep('win'); else if(lose) beep('ng');
     bindStamps();
   }
   $('nextR').addEventListener('click', nextRound);
 }
-function bindStamps(){ var st=$('ovStamps'); if(st) st.addEventListener('click', function(ev){ var b=ev.target.closest('button'); if(!b||!R) return; R.net.send({t:'st', e:b.dataset.s}); stampFly(b.dataset.s); }); }
+function bindStamps(){ var st=$('ovStamps'); if(st) st.addEventListener('click', function(ev){ var b=ev.target.closest('button'); if(b) sendStamp(b.dataset.s, st); }); }
 function nextRound(){
   if(G.r>=2){ finish(); return; }
   G.r++; G.phase='idle'; G.lastLead=0; updateBar(); setLane('laneMe',0,''); if(G.opp) setLane('laneOpp',0,'');
@@ -724,7 +747,7 @@ function finalView(mt, opp, rival, kind, replyUrl, practice){
     '<table class="rt"><tr><th></th><th>あなた / '+esc(opp.nm)+'</th><th>あなた</th><th>'+esc(opp.nm)+'</th></tr>'+rows+
     '<tr><td>合計</td><td></td><td>'+sec(mt.totalA)+'</td><td>'+sec(mt.totalB)+'</td></tr></table>'+
     (st?'<div class="recl">'+st+(practice?'（2回目からは練習。記録は最初の1回だけ）':'')+'</div>':'')+(hcl.length?'<div class="vline s">'+hcl.join(' ・ ')+'</div>':'')+
-    (kind==='live'?'<div class="stamps" id="ovStamps">'+STAMPS.map(function(s){ return '<button data-s="'+s+'">'+s+'</button>'; }).join('')+'</div>':'')+
+    (kind==='live'?'<div class="stamps" id="ovStamps">'+stampBtns()+'</div>':'')+
     '<div class="btns">'+
       (kind==='live'?'<button class="btn hot big" id="again">もう1回！</button>':'')+
       (kind==='ghost'?'<button class="btn hot big" id="sendReply">返事を送る</button><button class="btn" id="retry">もう1回（同じ挑戦状）</button>':'')+
