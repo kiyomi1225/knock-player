@@ -278,7 +278,7 @@ table.rt .dl{font-size:11px;color:var(--ng);display:block}
       <details id="rulesBox"><summary>ルール</summary>
         <ol class="rules">
           <li><b>3ラウンド</b>。1ラウンド<b>3問</b>。2人に同じ問題が出る</li>
-          <li>ラウンドの前に<b>じゃんけん</b>（10秒以内に選ぶ）。<b>負けた人は3秒おくれてスタート</b>（かけ算・わり算は6秒）。あいこは同時</li>
+          <li>ラウンドの前に<b>じゃんけん</b>（30秒以内に選ぶ。リアルタイムは2人同時にスタート）。<b>負けた人は3秒おくれてスタート</b>（かけ算・わり算は6秒）。あいこは同時</li>
           <li>先に3問解いた人がラウンドの勝ち。<b>1点・1点・最終ラウンドは2点</b></li>
           <li>まちがえると<b>2秒ストップ</b>。2回まちがえると答えが出る</li>
           <li>点が同じなら、合計タイムが速い人の勝ち</li>
@@ -357,9 +357,13 @@ var SIGN={add:'+', sub:'−', mul:'×', div:'÷'};
 var PLACE=['一の位','十の位','百の位','千の位','一万の位','十万の位'];
 var STAMPS=['👏','😆','😭','🔥','😎','🤯','💪','🎉'];
 var WORDS=['ナイス！','おしい！','まだまだ！','つよすぎ…','もう1回！','よろしく！'];
+// じゃんけん中だけのスタンプ（読み合い・はったり用）
+var JEMO=['😏','🤔','😎','🔥'];
+var JWORDS=['ふふふ…','読めてるよ','グー出すよ','チョキ出すよ','パー出すよ'];
 var stampAt=0;
 var BASE=location.origin+location.pathname;
-var JANKEN_SEC=10;
+var JANKEN_SEC=30;
+var NEXT_SEC=15;   // ラウンド結果から自動で次へ進むまで（2人そろってからじゃんけんを始める）
 
 function teamOf(id){ for(var i=0;i<TEAMS.length;i++) if(TEAMS[i].id===id) return TEAMS[i]; return TEAMS[3]; }
 function esc(s){ return String(s).replace(/[&<>"']/g, function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]; }); }
@@ -392,11 +396,11 @@ function openOv(html){ $('ov').innerHTML='<div class="overlay"><div class="card"
 function closeOv(){ $('ov').innerHTML=''; }
 function toast(t){ var e=$('toast'); e.textContent=t; e.classList.remove('show'); void e.offsetWidth; e.classList.add('show'); }
 function banner(t){ var b=$('banner'); if(!t){ b.hidden=true; return; } b.textContent=t; b.hidden=false; }
-function isStamp(e){ return STAMPS.indexOf(e)>=0 || WORDS.indexOf(e)>=0; }
-function stampBtns(){ return STAMPS.map(function(s){ return '<button data-s="'+s+'">'+s+'</button>'; }).join('')+WORDS.map(function(s){ return '<button class="w" data-s="'+s+'">'+s+'</button>'; }).join(''); }
+function isStamp(e){ return [STAMPS, WORDS, JEMO, JWORDS].some(function(a){ return a.indexOf(e)>=0; }); }
+function stampBtns(janken){ var em=janken?JEMO:STAMPS, wd=janken?JWORDS:WORDS; return em.map(function(s){ return '<button data-s="'+s+'">'+s+'</button>'; }).join('')+wd.map(function(s){ return '<button class="w" data-s="'+s+'">'+s+'</button>'; }).join(''); }
 /** スタンプを出す。from があれば「だれから」を小さく添えて、その人の色のふちにする */
 function stampFly(e, from){
-  var d=document.createElement('div'), w=WORDS.indexOf(e)>=0;
+  var d=document.createElement('div'), w=WORDS.indexOf(e)>=0 || JWORDS.indexOf(e)>=0;
   d.className='stampFly'+(w?' txt':''); d.textContent=e;
   if(from){ var sm=document.createElement('small'); sm.textContent=from.nm; d.appendChild(sm); d.style.setProperty('--c', teamOf(from.m).color); }
   d.style.left=(35+Math.random()*30)+'%';
@@ -532,6 +536,7 @@ function onMsg(m){
     case 'miss': if(g && m.g===g.cfg.seed){ laneMiss('laneOpp'); } break;
     case 'rend': if(g && m.g===g.cfg.seed && Array.isArray(m.sp) && m.sp.length===3){ g.opd.sp[m.r]=m.sp.map(Number); g.oppProg[m.r]=3; checkRoundEnd(); } break;
     case 'st': if(isStamp(m.e)) stampFly(m.e, R.peer); break;
+    case 'nx': if(g && m.g===g.cfg.seed){ g.nx.opp[m.r]=true; maybeNext(); } break;
     case 'bye': R.peer=null; R.peerReady=false; banner((g && !g.done) ? '相手がぬけました' : ''); if(g && !g.done){ G=null; stopPlay(); closeOv(); show('room'); } renderRoom(); break;
   }
 }
@@ -542,7 +547,7 @@ var G=null;
 function startGame(o){
   G={kind:o.kind, cfg:L.cleanCfg(o.cfg), hc:o.hc, opp:o.opp, ch:o.ch||null, set:L.makeSet(o.cfg), r:0,
      my:{h:[], sp:[[],[],[]], miss:0}, opd: o.ghost ? {h:o.ghost.h.slice(), sp:o.ghost.sp.map(function(a){ return a.slice(); })} : {h:[], sp:[]},
-     oppProg:{}, pts:{me:0, opp:0}, rounds:[], done:false};
+     oppProg:{}, pts:{me:0, opp:0}, rounds:[], done:false, nx:{me:{}, opp:{}}};
   var m=me();
   $('lnMe').textContent=m.nm; $('laneMe').style.setProperty('--c', teamOf(m.m).color);
   document.documentElement.style.setProperty('--me', teamOf(m.m).color);
@@ -570,7 +575,9 @@ function jankenPick(){
     : '負けたら '+jm+'秒おくれてスタート'+(G.kind==='ghost'?'。相手の手はもう決まっている…':'');
   openOv('<h3>ラウンド '+(r+1)+(r===2&&G.kind!=='create'?' <small style="font-size:.6em;color:var(--ng)">2点！</small>':'')+'</h3><p class="sub2">じゃんけん… '+esc(lead)+'</p>'+
     '<div class="hands" id="hands">'+L.HANDS.map(function(h){ return '<button data-h="'+h+'">'+L.HAND_ICON[h]+'<small>'+L.HAND_NAME[h]+'</small></button>'; }).join('')+'</div>'+
-    '<div class="tbar"><i id="jt"></i></div>'+histHtml());
+    '<div class="tbar"><i id="jt"></i></div>'+histHtml()+
+    (G.kind==='live'?'<div class="stamps" id="ovStamps">'+stampBtns(true)+'</div>':''));
+  bindStamps();
   var t0=Date.now();
   G.jTimer=setInterval(function(){ var left=JANKEN_SEC*1000-(Date.now()-t0); var jt=$('jt'); if(jt) jt.style.width=Math.max(0,left/(JANKEN_SEC*10))+'%';
     if(left<=0){ choose(L.HANDS[Math.floor(Math.random()*3)], true); } }, 200);
@@ -701,8 +708,24 @@ function roundResult(x){
     if(win) beep('win'); else if(lose) beep('ng');
     bindStamps();
   }
-  $('nextR').addEventListener('click', nextRound);
+  $('nextR').addEventListener('click', goNext);
+  if(G.kind==='live' && !last){
+    var left=NEXT_SEC, lab=$('nextR').textContent;
+    $('nextR').textContent=lab+'（'+left+'）';
+    G.nxTimer=setInterval(function(){ left--; var b=$('nextR'); if(!b || G.nx.me[r]){ clearInterval(G.nxTimer); return; } b.textContent=lab+'（'+left+'）'; if(left<=0) goNext(); }, 1000);
+  }
 }
+/** リアルタイムでは2人とも「次へ」を押してから、同時にじゃんけん画面を開く */
+function goNext(){
+  var r=G.r;
+  if(G.kind!=='live' || r>=2){ nextRound(); return; }
+  if(G.nx.me[r]) return;
+  G.nx.me[r]=true; clearInterval(G.nxTimer);
+  R.net.send({t:'nx', g:G.cfg.seed, r:r});
+  var b=$('nextR'); if(b){ b.disabled=true; b.textContent='相手を待っています…'; }
+  maybeNext();
+}
+function maybeNext(){ var r=G.r; if(G.phase==='res' && G.nx.me[r] && G.nx.opp[r] && G.advanced!==r){ G.advanced=r; nextRound(); } }
 function bindStamps(){ var st=$('ovStamps'); if(st) st.addEventListener('click', function(ev){ var b=ev.target.closest('button'); if(b) sendStamp(b.dataset.s, st); }); }
 function nextRound(){
   if(G.r>=2){ finish(); return; }
