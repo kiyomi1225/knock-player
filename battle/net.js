@@ -7,7 +7,7 @@
 (function (root) {
   'use strict';
   var BROKERS = ['wss://broker.hivemq.com:8884/mqtt', 'wss://broker.emqx.io:8084/mqtt'];
-  var PREFIX = 'knock-battle-v1/';
+  var PREFIX = 'knock-battle-v2/';
 
   function utf8(s) { return new TextEncoder().encode(s); }
   function str(s) { var b = utf8(s), o = new Uint8Array(b.length + 2); o[0] = b.length >> 8; o[1] = b.length & 255; o.set(b, 2); return o; }

@@ -3,7 +3,7 @@
  * ブラウザでは window.BattleLogic、Node では module.exports。core.js（HissanCore）を使う。
  *
  * ルール（2026-11-11 決定）
- *  - 3ラウンド × 1ラウンド3問。2人に同じ問題（同じ seed）
+ *  - 3ラウンド × 1ラウンド5問（2026-11-11 に 3問から変更）。2人に同じ問題（同じ seed）
  *  - ラウンドの前にじゃんけん。負けた側はスタートが遅れる（たし算・ひき算・ミックス 5秒、かけ算・わり算 10秒。2026-11-11 に 3/6秒から変更）。あいこは同時
  *  - ミスは2秒止まる（解く時間に入るので、ここでは solve に含まれている）
  *  - ラウンドは「遅れ＋解いた時間」が短いほうの勝ち。1・2ラウンドは1点、最終ラウンドは2点
@@ -17,7 +17,7 @@
   'use strict';
 
   var OPS = ['add', 'sub', 'mix', 'mul', 'div'];
-  var ROUNDS = 3, PER = 3;
+  var ROUNDS = 3, PER = 5;
   var POINTS = [1, 1, 2];
   var MISS_MS = 2000;
   var HANDS = ['g', 'c', 'p'];               // グー・チョキ・パー
@@ -46,7 +46,7 @@
     };
   }
 
-  /** 9問を作る（本体アプリの makeSet と同じ手順）。round r の問題は set.slice(r*3, r*3+3) */
+  /** 15問を作る（本体アプリの makeSet と同じ手順）。round r の問題は set.slice(r*PER, r*PER+PER) */
   function makeSet(cfg) {
     var c = cleanCfg(cfg), rng = mulberry(c.seed), set = [], prevKey = '';
     for (var i = 0; i < ROUNDS * PER; i++) {
@@ -106,7 +106,7 @@
   }
   function solveOf(P, r) { return P.sp[r][PER - 1]; }
 
-  /** ゴースト: そのラウンドの経過 t(ms) で何問進んでいるか（0〜3）。delay の間は 0 */
+  /** ゴースト: そのラウンドの経過 t(ms) で何問進んでいるか（0〜PER）。delay の間は 0 */
   function ghostProgress(spr, delay, t) {
     t -= delay; if (t <= 0) return 0;
     var prev = 0;
@@ -149,12 +149,12 @@
     return { nm: cleanName(p.nm), m: String(p.m || 'chigusa').replace(/[^a-z]/g, '').slice(0, 12), h: h, sp: sp, miss: Math.max(0, Math.min(999, p.miss | 0)) };
   }
   /** 挑戦状: 出した人(a)の手と記録。ハンデは受けた人が自分の記録から決める */
-  function makeChallenge(cfg, a, id) { return encode({ v: 2, k: 'c', id: id, c: cleanCfg(cfg), a: a }); }
+  function makeChallenge(cfg, a, id) { return encode({ v: 3, k: 'c', id: id, c: cleanCfg(cfg), a: a }); }
   /** 返事: 挑戦状に受けた人(b)の手と記録、使ったハンデ（hcA=出した人, hcB=受けた人）を足す */
-  function makeReply(ch, b, hc) { return encode({ v: 2, k: 'r', id: ch.id, c: ch.c, a: ch.a, b: b, hc: [hc.a | 0, hc.b | 0] }); }
+  function makeReply(ch, b, hc) { return encode({ v: 3, k: 'r', id: ch.id, c: ch.c, a: ch.a, b: b, hc: [hc.a | 0, hc.b | 0] }); }
   function readCode(s) {
     var o = decode(s);
-    if (!o || o.v !== 2 || (o.k !== 'c' && o.k !== 'r')) return null;
+    if (!o || o.v !== 3 || (o.k !== 'c' && o.k !== 'r')) return null;
     var a = cleanPlayer(o.a); if (!a) return null;
     var out = { k: o.k, id: String(o.id || '').replace(/[^\w]/g, '').slice(0, 16), c: cleanCfg(o.c), a: a };
     if (o.k === 'r') {

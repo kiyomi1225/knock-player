@@ -8,7 +8,7 @@
 <title>筆算バトル</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&family=M+PLUS+1p:wght@400;500;700&family=Yusei+Magic&display=swap">
 <style>
-/* 筆算バトル: じゃんけん × 筆算。3ラウンド × 3問。解き方は筆算ノックと同じ（光るマスに数字を押す） */
+/* 筆算バトル: じゃんけん × 筆算。3ラウンド × 5問。解き方は筆算ノックと同じ（光るマスに数字を押す） */
 :root{
   --paper:#0f1a44;--sheet:#ffffff;--grid:#cfdcee;--ink:#1c2a44;--pencil:#4a5468;--muted:#6b7890;--line:#dfe6f0;
   --marker:#fff3a6;--marker-strong:#ffd84d;--accent:#2fa7e8;--accent-ink:#ffffff;--ok:#2e9e6b;--ng:#e53935;--ghost:#b7c2d4;
@@ -122,6 +122,17 @@ details[open] summary{margin-bottom:10px}
 .track .runner{position:absolute;top:50%;width:22px;height:22px;margin-left:-11px;border-radius:50%;background:var(--c);border:3px solid #fff;transform:translateY(-50%);box-sizing:border-box;left:0;box-shadow:0 1px 4px rgba(0,0,0,.4)}
 .lane .st{font-family:var(--font-num);font-weight:800;font-size:13px;text-align:right;white-space:nowrap}
 .lane.miss .runner{animation:shake .35s ease;background:var(--ng)}
+/* 追い抜き・じゃんけんのドラムロール */
+.lane.passed .runner{animation:boost .7s ease}
+.lane.passedBy .runner{animation:shake .45s ease}
+@keyframes boost{0%{transform:translateY(-50%) scale(1)}35%{transform:translateY(-50%) scale(1.6);box-shadow:0 0 16px 6px #ffd84d}100%{transform:translateY(-50%) scale(1)}}
+.lane.passed .track{animation:trackflash .7s ease}
+@keyframes trackflash{30%{box-shadow:0 0 0 2px #ffd84d,0 0 14px #ffd84d}}
+.reveal.rolling .hand{animation:none;filter:blur(.6px)}
+.reveal .win .hand{animation:winpop .55s cubic-bezier(.3,1.7,.5,1) forwards}
+.reveal .lose .hand{animation:losewob .6s ease forwards}
+@keyframes winpop{0%{transform:scale(.4)}60%{transform:scale(1.45)}100%{transform:scale(1.25)}}
+@keyframes losewob{0%{transform:scale(1)}20%{transform:rotate(-14deg)}40%{transform:rotate(12deg)}60%{transform:rotate(-8deg)}100%{transform:scale(.8);filter:grayscale(.6)}}
 .lane .tag{font-size:11px;font-weight:800;color:#ffd84d}
 .score{font-family:var(--font-num);font-weight:800;font-size:clamp(22px,4vmin,30px);white-space:nowrap}
 .score .m{color:var(--me)} .score .o{color:var(--opp)}
@@ -152,7 +163,12 @@ main{display:flex;flex-direction:column;align-items:center;gap:10px;min-height:0
 .cell.ansbox::before{content:"";position:absolute;inset:7px;border:2px solid var(--marker-strong);border-radius:10px}
 .cell.ansbox.target::before{display:none}
 .cell.wrong{animation:shake .35s ease}
-.cell.just .num{animation:pop .3s ease}
+/* 気持ちいい演出: 数字がはずむ・光の輪・れんぞく表示 */
+.cell.just .num{animation:numpop .36s cubic-bezier(.3,1.7,.5,1)}
+@keyframes numpop{0%{transform:scale(.4)}55%{transform:scale(1.45)}100%{transform:scale(1)}}
+.fxRing{position:fixed;z-index:55;pointer-events:none;border-radius:50%;border:3px solid var(--fx,#ffd84d);box-shadow:0 0 12px var(--fx,#ffd84d);transform:translate(-50%,-50%);opacity:0}
+.comboTxt{position:fixed;z-index:56;pointer-events:none;left:50%;transform:translateX(-50%);font-family:var(--font-talk);color:#fff;white-space:nowrap;text-shadow:0 0 10px var(--fx,#ffd84d),0 3px 0 var(--fx,#ffd84d),0 4px 8px rgba(0,0,0,.4);animation:combo 1.1s ease forwards}
+@keyframes combo{0%{opacity:0;transform:translate(-50%,12px) scale(.5)}22%{opacity:1;transform:translate(-50%,0) scale(1.2)}38%{transform:translate(-50%,0) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-26px)}}
 .cell.struck .num{position:relative}
 .cell.struck .num::after{content:"";position:absolute;left:-10%;right:-10%;top:48%;height:3px;background:var(--ng);transform:rotate(-18deg);border-radius:2px}
 .over{display:flex;gap:5px;align-items:baseline;line-height:1}
@@ -277,9 +293,9 @@ table.rt .dl{font-size:11px;color:var(--ng);display:block}
     <section class="panel">
       <details id="rulesBox"><summary>ルール</summary>
         <ol class="rules">
-          <li><b>3ラウンド</b>。1ラウンド<b>3問</b>。2人に同じ問題が出る</li>
+          <li><b>3ラウンド</b>。1ラウンド<b>5問</b>。2人に同じ問題が出る</li>
           <li>ラウンドの前に<b>じゃんけん</b>（30秒以内に選ぶ。リアルタイムは2人同時にスタート）。<b>負けた人は5秒おくれてスタート</b>（かけ算・わり算は10秒）。あいこは同時</li>
-          <li>先に3問解いた人がラウンドの勝ち。<b>1点・1点・最終ラウンドは2点</b></li>
+          <li>先に5問解いた人がラウンドの勝ち。<b>1点・1点・最終ラウンドは2点</b></li>
           <li>まちがえると<b>2秒ストップ</b>。2回まちがえると答えが出る</li>
           <li>点が同じなら、合計タイムが速い人の勝ち</li>
           <li>同じ相手に<b>2勝以上勝ちこす</b>と、毎ラウンド<b>+2秒ハンデ</b>（3勝差で+4秒）</li>
@@ -317,8 +333,8 @@ table.rt .dl{font-size:11px;color:var(--ng);display:block}
   <div class="bar">
     <div class="rinfo"><b id="rLabel">ラウンド 1/3</b><small id="rPts">1点</small></div>
     <div class="lanes">
-      <div class="lane" id="laneMe" style="--c:var(--me)"><span class="who"><i></i><span id="lnMe">じぶん</span></span><div class="track"><i class="fill"></i><i class="tick" style="left:33.3%"></i><i class="tick" style="left:66.6%"></i><span class="runner"></span></div><span class="st">0/3</span></div>
-      <div class="lane" id="laneOpp" style="--c:var(--opp)"><span class="who"><i></i><span id="lnOpp">あいて</span></span><div class="track"><i class="fill"></i><i class="tick" style="left:33.3%"></i><i class="tick" style="left:66.6%"></i><span class="runner"></span></div><span class="st">0/3</span></div>
+      <div class="lane" id="laneMe" style="--c:var(--me)"><span class="who"><i></i><span id="lnMe">じぶん</span></span><div class="track"><i class="fill"></i><i class="tick" style="left:20%"></i><i class="tick" style="left:40%"></i><i class="tick" style="left:60%"></i><i class="tick" style="left:80%"></i><span class="runner"></span></div><span class="st">0/5</span></div>
+      <div class="lane" id="laneOpp" style="--c:var(--opp)"><span class="who"><i></i><span id="lnOpp">あいて</span></span><div class="track"><i class="fill"></i><i class="tick" style="left:20%"></i><i class="tick" style="left:40%"></i><i class="tick" style="left:60%"></i><i class="tick" style="left:80%"></i><span class="runner"></span></div><span class="st">0/5</span></div>
     </div>
     <div class="score" id="scoreBox"><span class="m" id="scMe">0</span> - <span class="o" id="scOpp">0</span><small>点</small></div>
   </div>
@@ -376,16 +392,46 @@ var REC=(function(){ var o=null; try{ o=JSON.parse(localStorage.getItem('kb.p'))
 function saveRec(){ try{ localStorage.setItem('kb.p', JSON.stringify(REC)); }catch(e){} }
 function me(){ return {nm:L.cleanName(REC.nm), m:REC.m||'chigusa'}; }
 
+// ---------- 気持ちいい演出 ----------
+/** 正解が続くと音が1つずつ高くなる（ドレミ…）。ミスで元にもどる。入れたマスから光の輪、5回ごとに「れんぞく！」 */
+var FX={combo:0};
+function fxColor(){ return teamOf(me().m).color; }
+var COMBO_STEP=[0,2,4,5,7,9,11,12,14,16];
+function comboFreq(n){ return 560*Math.pow(2, COMBO_STEP[Math.min(Math.max(n,1),COMBO_STEP.length)-1]/12); }
+function fxHit(cell){
+  FX.combo++; beep('ok', FX.combo);
+  var n=FX.combo, col=fxColor();
+  if(n>=5 && n%5===0) comboTxt(n, col);
+  if(reduced || !cell) return;
+  var r=cell.getBoundingClientRect(), big=n%10===0, sz=Math.max(r.width, r.height)*(big?1.1:.85), d=document.createElement('div');
+  d.className='fxRing'; d.style.left=(r.left+r.width/2)+'px'; d.style.top=(r.top+r.height/2)+'px'; d.style.width=sz+'px'; d.style.height=sz+'px'; d.style.setProperty('--fx', col);
+  document.body.appendChild(d);
+  if(!d.animate){ d.remove(); return; }
+  var a=d.animate([{transform:'translate(-50%,-50%) scale(.4)', opacity:1},{transform:'translate(-50%,-50%) scale('+(big?2.8:1.9)+')', opacity:0}], {duration:big?650:400, easing:'ease-out'});
+  a.onfinish=function(){ d.remove(); };
+}
+function fxMiss(){ FX.combo=0; }
+function comboTxt(n, col){
+  var sh=$('sheet').getBoundingClientRect(), d=document.createElement('div');
+  d.className='comboTxt'; d.textContent=n+'れんぞく！'+(n>=10?'🔥':''); d.style.setProperty('--fx', col);
+  d.style.top=Math.max(8, sh.top-24)+'px'; d.style.fontSize=Math.min(30+n*1.4, 66)+'px';
+  document.body.appendChild(d); setTimeout(function(){ d.remove(); }, 1200);
+}
+
 // ---------- 音 ----------
 var actx=null;
-function beep(kind){
+function beep(kind, n){
   if(!REC.sound) return;
   try{
     if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
     var o=actx.createOscillator(), g=actx.createGain(); o.connect(g); g.connect(actx.destination); var t=actx.currentTime;
-    if(kind==='ok'){ o.type='sine'; o.frequency.setValueAtTime(720,t); o.frequency.setValueAtTime(1080,t+.07); g.gain.setValueAtTime(.06,t); g.gain.exponentialRampToValueAtTime(.0001,t+.2); o.start(t); o.stop(t+.22); }
+    if(kind==='ok'){ var f=n?comboFreq(n):720; o.type='sine'; o.frequency.setValueAtTime(f,t); o.frequency.setValueAtTime(f*1.5,t+.07); g.gain.setValueAtTime(.06,t); g.gain.exponentialRampToValueAtTime(.0001,t+.2); o.start(t); o.stop(t+.22); }
     else if(kind==='win'){ o.type='triangle'; [523,659,784,1046].forEach(function(f,i){ o.frequency.setValueAtTime(f,t+i*.1); }); g.gain.setValueAtTime(.08,t); g.gain.exponentialRampToValueAtTime(.0001,t+.6); o.start(t); o.stop(t+.62); }
     else if(kind==='tick'){ o.type='sine'; o.frequency.setValueAtTime(990,t); g.gain.setValueAtTime(.05,t); g.gain.exponentialRampToValueAtTime(.0001,t+.12); o.start(t); o.stop(t+.13); }
+    else if(kind==='up'){ o.type='sine'; o.frequency.setValueAtTime(600,t); o.frequency.exponentialRampToValueAtTime(1500,t+.18); g.gain.setValueAtTime(.07,t); g.gain.exponentialRampToValueAtTime(.0001,t+.26); o.start(t); o.stop(t+.28); }
+    else if(kind==='down'){ o.type='sine'; o.frequency.setValueAtTime(520,t); o.frequency.exponentialRampToValueAtTime(200,t+.25); g.gain.setValueAtTime(.06,t); g.gain.exponentialRampToValueAtTime(.0001,t+.3); o.start(t); o.stop(t+.32); }
+    else if(kind==='roll'){ o.type='square'; o.frequency.setValueAtTime(240+Math.random()*60,t); g.gain.setValueAtTime(.02,t); g.gain.exponentialRampToValueAtTime(.0001,t+.04); o.start(t); o.stop(t+.05); }
+    else if(kind==='don'){ o.type='triangle'; o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(70,t+.3); g.gain.setValueAtTime(.18,t); g.gain.exponentialRampToValueAtTime(.0001,t+.35); o.start(t); o.stop(t+.37); }
     else { o.type='square'; o.frequency.setValueAtTime(170,t); g.gain.setValueAtTime(.04,t); g.gain.exponentialRampToValueAtTime(.0001,t+.16); o.start(t); o.stop(t+.18); }
   }catch(e){}
 }
@@ -412,9 +458,9 @@ function sendStamp(e, box){
   stampAt=Date.now(); R.net.send({t:'st', e:e}); stampFly(e);
   if(box){ box.classList.add('cool'); setTimeout(function(){ box.classList.remove('cool'); }, 800); }
 }
-function confetti(colors){
+function confetti(colors, n){
   if(reduced) return; var cv=$('confetti'), g=cv.getContext('2d'), W=cv.width=innerWidth, H=cv.height=innerHeight, ps=[];
-  for(var i=0;i<120;i++) ps.push({x:Math.random()*W, y:-20-Math.random()*H*.4, vx:(Math.random()-.5)*3, vy:2+Math.random()*3, r:Math.random()*6.3, c:colors[i%colors.length], s:5+Math.random()*6});
+  for(var i=0;i<(n||120);i++) ps.push({x:Math.random()*W, y:-20-Math.random()*H*.4, vx:(Math.random()-.5)*3, vy:2+Math.random()*3, r:Math.random()*6.3, c:colors[i%colors.length], s:5+Math.random()*6});
   var t0=performance.now();
   (function frame(t){ g.clearRect(0,0,W,H); if(t-t0>2600){ g.clearRect(0,0,W,H); return; }
     ps.forEach(function(p){ p.x+=p.vx; p.y+=p.vy; p.r+=.1; g.save(); g.translate(p.x,p.y); g.rotate(p.r); g.fillStyle=p.c; g.fillRect(-p.s/2,-p.s/4,p.s,p.s/2); g.restore(); });
@@ -534,7 +580,7 @@ function onMsg(m){
     case 'hand': if(g && m.g===g.cfg.seed && L.HANDS.indexOf(m.h)>=0){ g.opd.h[m.r]=m.h; afterHands(); } break;
     case 'prog': if(g && m.g===g.cfg.seed){ g.oppProg[m.r]=Math.max(g.oppProg[m.r]||0, Number(m.v)||0); } break;
     case 'miss': if(g && m.g===g.cfg.seed){ laneMiss('laneOpp'); } break;
-    case 'rend': if(g && m.g===g.cfg.seed && Array.isArray(m.sp) && m.sp.length===3){ g.opd.sp[m.r]=m.sp.map(Number); g.oppProg[m.r]=3; checkRoundEnd(); } break;
+    case 'rend': if(g && m.g===g.cfg.seed && Array.isArray(m.sp) && m.sp.length===L.PER){ g.opd.sp[m.r]=m.sp.map(Number); g.oppProg[m.r]=L.PER; checkRoundEnd(); } break;
     case 'st': if(isStamp(m.e)) stampFly(m.e, R.peer); break;
     case 'nx': if(g && m.g===g.cfg.seed){ g.nx.opp[m.r]=true; maybeNext(); } break;
     case 'bye': R.peer=null; R.peerReady=false; banner((g && !g.done) ? '相手がぬけました' : ''); if(g && !g.done){ G=null; stopPlay(); closeOv(); show('room'); } renderRoom(); break;
@@ -604,11 +650,22 @@ function afterHands(){
   G.delay={me:(j<0?jm:0)+G.hc.me, opp:(j>0?jm:0)+G.hc.opp};
   var msg = j>0 ? '勝ち！ '+esc(G.opp.nm)+' が '+jm/1000+'秒おくれてスタート' : j<0 ? '負け… '+jm/1000+'秒おくれてスタート' : 'あいこ！ 同時にスタート';
   var hcl=[]; if(G.hc.me) hcl.push('あなた +'+G.hc.me/1000+'秒'); if(G.hc.opp) hcl.push(esc(G.opp.nm)+' +'+G.hc.opp/1000+'秒');
+  rollThenReveal(function(){
   openOv('<h3>じゃん けん ぽん！</h3><div class="reveal"><div class="side '+(j>0?'win':j<0?'lose':'')+'" style="--c:var(--me)"><span class="hand">'+L.HAND_ICON[G.my.h[r]]+'</span><span class="nm">あなた</span></div><span class="vsT" style="color:var(--muted)">VS</span>'+
     '<div class="side '+(j<0?'win':j>0?'lose':'')+'" style="--c:var(--opp)"><span class="hand">'+L.HAND_ICON[G.opd.h[r]]+'</span><span class="nm">'+esc(G.opp.nm)+'</span></div></div>'+
     '<div class="vline">'+msg+'</div>'+(hcl.length?'<div class="vline s">ハンデ: '+hcl.join(' / ')+'</div>':''));
-  beep(j>0?'win':j<0?'ng':'tick');
+  beep('don'); setTimeout(function(){ beep(j>0?'win':j<0?'ng':'tick'); }, 180);
   setTimeout(countdown, 2200);
+  });
+}
+/** 手を見せる前に、ダダダダ…とドラムロール */
+function rollThenReveal(show){
+  if(reduced){ show(); return; }
+  var g=G, r=G.r;
+  openOv('<h3>じゃん けん…</h3><div class="reveal rolling"><div class="side" style="--c:var(--me)"><span class="hand" id="rlA">✊</span><span class="nm">あなた</span></div><span class="vsT" style="color:var(--muted)">VS</span>'+
+    '<div class="side" style="--c:var(--opp)"><span class="hand" id="rlB">✋</span><span class="nm">'+esc(G.opp.nm)+'</span></div></div>');
+  var i=0, iv=setInterval(function(){ i++; var a=$('rlA'), b=$('rlB'); if(!a||!b){ clearInterval(iv); return; } a.textContent=L.HAND_ICON[L.HANDS[i%3]]; b.textContent=L.HAND_ICON[L.HANDS[(i+2)%3]]; beep('roll'); }, 85);
+  setTimeout(function(){ clearInterval(iv); if(G!==g || G.r!==r) return; show(); }, 1000);
 }
 function countdown(){
   var n=3;
@@ -623,7 +680,7 @@ function countdown(){
 var S={playing:false, busy:false, si:0, p:null, steps:[], idx:0, wrong:0, sheet:null, plan:null, left:0, cols:0};
 var laneTimer=null;
 function beginRound(){
-  G.T0=Date.now(); G.phase='play'; G.my.sp[G.r]=[];
+  G.T0=Date.now(); G.phase='play'; G.my.sp[G.r]=[]; fxMiss();
   S.si=0; S.playing=true; loadProblem();
   if(G.delay.me>0){ S.busy=true; $('pad').classList.add('dim'); $('hold').hidden=false; $('holdT').textContent= G.hc.me && G.delay.me===G.hc.me ? 'ハンデでおくれてスタート' : 'おくれてスタート'; }
   else unlock();
@@ -634,7 +691,7 @@ function tick(){
   if(!G || G.phase==='idle') return;
   var t=Date.now()-G.T0;
   if(!$('hold').hidden){ var left=G.delay.me-t; $('holdN').textContent=Math.max(1, Math.ceil(left/1000)); if(left<=0) unlock(); }
-  var mine = G.phase==='play' ? S.si + (S.steps.length ? S.idx/S.steps.length : 0) : 3;
+  var mine = G.phase==='play' ? S.si + (S.steps.length ? S.idx/S.steps.length : 0) : L.PER;
   setLane('laneMe', mine, G.phase==='play' && t<G.delay.me ? 'まって…' : '');
   if(G.opp){
     var v, tag='';
@@ -642,25 +699,29 @@ function tick(){
     else { v=G.oppProg[G.r]||0; if(t<G.delay.opp && v===0) tag='まって…'; }
     setLane('laneOpp', v, tag);
     var lead = mine>v+0.05 ? 1 : v>mine+0.05 ? -1 : 0;
-    if(G.phase==='play' && G.lastLead && lead && lead!==G.lastLead && mine>0.3 && v>0.3) toast(lead>0 ? '逆転！' : 'ぬかれた！');
+    if(G.phase==='play' && G.lastLead && lead && lead!==G.lastLead && mine>0.3 && v>0.3) passFx(lead>0);
     if(lead) G.lastLead=lead;
   }
 }
 function setLane(id, v, tag){
-  var l=$(id); v=Math.max(0, Math.min(3, v));
-  l.querySelector('.runner').style.left=(v/3*100)+'%'; l.querySelector('.fill').style.width=(v/3*100)+'%';
-  l.querySelector('.st').innerHTML= tag ? '<span class="tag">'+tag+'</span>' : (v>=3 ? 'ゴール' : Math.floor(v)+'/3');
+  var l=$(id); v=Math.max(0, Math.min(L.PER, v));
+  l.querySelector('.runner').style.left=(v/L.PER*100)+'%'; l.querySelector('.fill').style.width=(v/L.PER*100)+'%';
+  l.querySelector('.st').innerHTML= tag ? '<span class="tag">'+tag+'</span>' : (v>=L.PER ? 'ゴール' : Math.floor(v)+'/'+L.PER);
+}
+function passFx(up){
+  toast(up ? 'ぬいた！⚡' : 'ぬかれた！'); beep(up ? 'up' : 'down');
+  var l=$('laneMe'); l.classList.remove('passed','passedBy'); void l.offsetWidth; l.classList.add(up ? 'passed' : 'passedBy');
 }
 function laneMiss(id){ var l=$(id); l.classList.remove('miss'); void l.offsetWidth; l.classList.add('miss'); }
 function sendProg(){ if(G && G.kind==='live') R.net.send({t:'prog', g:G.cfg.seed, r:G.r, v:Math.round((S.si+(S.steps.length?S.idx/S.steps.length:0))*100)/100}); }
 function stopPlay(){ clearInterval(laneTimer); S.playing=false; $('hold').hidden=true; }
 
 function loadProblem(){
-  S.p=G.set[G.r*3+S.si]; S.steps=C.buildSteps(S.p); S.idx=0; S.wrong=0;
+  S.p=G.set[G.r*L.PER+S.si]; S.steps=C.buildSteps(S.p); S.idx=0; S.wrong=0;
   S.cols=C.columnCount(S.p); S.plan= S.p.op==='div' ? C.divPlan(S.p) : null; S.left= S.plan ? S.plan.leftCols : 0;
   S.sheet={carry:{}, over:{}, struck:{}, ans:{}, partial:{}, note:{}, point:false, quot:{}, rows:{}};
   $('pad').classList.toggle('dec', isDec(S.p));
-  $('qno').textContent=(S.si+1)+' 問目 / 3';
+  $('qno').textContent=(S.si+1)+' 問目 / '+L.PER;
   hideHint(); buildGrid(); fitCells(); renderStep();
 }
 function problemDone(){
@@ -669,13 +730,13 @@ function problemDone(){
   var t=Date.now()-G.solveStart, sp=G.my.sp[G.r], prev=sp.length?sp[sp.length-1]:0;
   sp.push(Math.max(prev+1, t));
   S.si++; sendProg();
-  if(S.si>=3){ S.playing=false; S.busy=true; $('pad').classList.add('dim'); roundDone(); return; }
+  if(S.si>=L.PER){ S.playing=false; S.busy=true; $('pad').classList.add('dim'); roundDone(); return; }
   setTimeout(function(){ if(!G||!S.playing) return; S.busy=false; loadProblem(); }, 350);
 }
 function roundDone(){
   G.phase='wait';
   if(G.kind==='live') R.net.send({t:'rend', g:G.cfg.seed, r:G.r, sp:G.my.sp[G.r]});
-  showHint('ゴール！ タイム <b>'+sec(G.delay.me+G.my.sp[G.r][2])+'</b> 秒'+(G.kind==='live' && !G.opd.sp[G.r] ? ' … 相手を待っています' : ''));
+  showHint('ゴール！ タイム <b>'+sec(G.delay.me+G.my.sp[G.r][L.PER-1])+'</b> 秒'+(G.kind==='live' && !G.opd.sp[G.r] ? ' … 相手を待っています' : ''));
   checkRoundEnd();
 }
 function checkRoundEnd(){
@@ -684,7 +745,7 @@ function checkRoundEnd(){
   if(G.kind==='create'){ G.phase='res'; setTimeout(function(){ roundResult(null); }, 600); return; }
   if(!G.opd.sp[r]) return;
   G.phase='res';
-  var x=L.roundResult(G.my.h[r], G.opd.h[r], G.my.sp[r][2], G.opd.sp[r][2], r, {op:G.cfg.op, hcA:G.hc.me, hcB:G.hc.opp});
+  var x=L.roundResult(G.my.h[r], G.opd.h[r], G.my.sp[r][L.PER-1], G.opd.sp[r][L.PER-1], r, {op:G.cfg.op, hcA:G.hc.me, hcB:G.hc.opp});
   G.rounds[r]=x; if(x.win==='A') G.pts.me+=x.pts; else if(x.win==='B') G.pts.opp+=x.pts;
   setTimeout(function(){ roundResult(x); }, G.kind==='ghost' ? 900 : 300);
 }
@@ -692,7 +753,7 @@ function roundResult(x){
   clearInterval(laneTimer); updateBar();
   var r=G.r, last=r===2;
   if(!x){
-    openOv('<h3>ラウンド '+(r+1)+'</h3><div class="bigScore">'+sec(G.my.sp[r][2])+' 秒</div><p>じゃんけん: '+L.HAND_ICON[G.my.h[r]]+' を記録した</p><div class="btns"><button class="btn" id="nextR">'+(last?'結果へ':'次のラウンドへ')+'</button></div>');
+    openOv('<h3>ラウンド '+(r+1)+'</h3><div class="bigScore">'+sec(G.my.sp[r][L.PER-1])+' 秒</div><p>じゃんけん: '+L.HAND_ICON[G.my.h[r]]+' を記録した</p><div class="btns"><button class="btn" id="nextR">'+(last?'結果へ':'次のラウンドへ')+'</button></div>');
   } else {
     var win=x.win==='A', lose=x.win==='B';
     var d=Math.abs(x.timeA-x.timeB);
@@ -700,12 +761,12 @@ function roundResult(x){
     openOv('<p class="sub2">ラウンド '+(r+1)+' の結果</p><div class="res '+(win?'win':lose?'lose':'')+'">'+say+'</div>'+
       (x.pts && win ? '<div class="vline">+'+x.pts+'点！</div>' : '')+
       '<table class="rt"><tr><th></th><th>じゃんけん</th><th>おくれ</th><th>解いた</th><th>合計</th></tr>'+
-      '<tr><td>あなた</td><td>'+L.HAND_ICON[x.ha]+'</td><td>'+(x.delayA?'+'+sec(x.delayA):'-')+'</td><td>'+sec(G.my.sp[r][2])+'</td><td class="'+(win?'w':'')+'">'+sec(x.timeA)+'</td></tr>'+
-      '<tr><td>'+esc(G.opp.nm)+'</td><td>'+L.HAND_ICON[x.hb]+'</td><td>'+(x.delayB?'+'+sec(x.delayB):'-')+'</td><td>'+sec(G.opd.sp[r][2])+'</td><td class="'+(lose?'w':'')+'">'+sec(x.timeB)+'</td></tr></table>'+
+      '<tr><td>あなた</td><td>'+L.HAND_ICON[x.ha]+'</td><td>'+(x.delayA?'+'+sec(x.delayA):'-')+'</td><td>'+sec(G.my.sp[r][L.PER-1])+'</td><td class="'+(win?'w':'')+'">'+sec(x.timeA)+'</td></tr>'+
+      '<tr><td>'+esc(G.opp.nm)+'</td><td>'+L.HAND_ICON[x.hb]+'</td><td>'+(x.delayB?'+'+sec(x.delayB):'-')+'</td><td>'+sec(G.opd.sp[r][L.PER-1])+'</td><td class="'+(lose?'w':'')+'">'+sec(x.timeB)+'</td></tr></table>'+
       '<div class="bigScore"><span class="m">'+G.pts.me+'</span> - <span class="o">'+G.pts.opp+'</span></div>'+
       (G.kind==='live'?'<div class="stamps" id="ovStamps">'+stampBtns()+'</div>':'')+
       '<div class="btns"><button class="btn" id="nextR">'+(last?'結果へ':'次のラウンドへ')+'</button></div>');
-    if(win) beep('win'); else if(lose) beep('ng');
+    if(win){ beep('win'); confetti([fxColor(),'#ffffff','#ffd84d'], 60); } else if(lose) beep('ng');
     bindStamps();
   }
   $('nextR').addEventListener('click', goNext);
@@ -739,7 +800,7 @@ function finish(){
   var my={nm:me().nm, m:me().m, h:G.my.h, sp:G.my.sp, miss:G.my.miss};
   if(G.kind==='create'){
     G.chId=Math.random().toString(36).slice(2,10);
-    var code=L.makeChallenge(G.cfg, my, G.chId), url=BASE+'#c='+code, tot=G.my.sp.reduce(function(s,a){ return s+a[2]; },0);
+    var code=L.makeChallenge(G.cfg, my, G.chId), url=BASE+'#c='+code, tot=G.my.sp.reduce(function(s,a){ return s+a[L.PER-1]; },0);
     openOv('<h3>挑戦状ができた！</h3><div class="bigScore">'+sec(tot)+' 秒</div><p>'+cfgLabel(G.cfg)+' ・ じゃんけんの手 '+G.my.h.map(function(h){ return L.HAND_ICON[h]; }).join(' ')+'（相手には見えない）</p>'+
       '<p>リンクを友だちに送ろう。友だちがあなたのゴーストと勝負して、返事のリンクを送り返してくれる。</p>'+
       '<div class="btns"><button class="btn hot big" id="shareCh">挑戦状を送る</button></div><textarea class="shareBox" rows="3" hidden readonly></textarea>'+
@@ -776,7 +837,7 @@ function finalView(mt, opp, rival, kind, replyUrl, practice){
       (kind==='ghost'?'<button class="btn hot big" id="sendReply">返事を送る</button><button class="btn" id="retry">もう1回（同じ挑戦状）</button>':'')+
       (kind==='reply'?'<button class="btn hot big" id="revenge">やり返す（新しい挑戦状）</button>':'')+
       '<button class="btn sub" id="toLobby">ロビーへ</button></div><textarea class="shareBox" rows="3" hidden readonly></textarea>');
-  if(win){ beep('win'); confetti([getComputedStyle(document.documentElement).getPropertyValue('--me').trim()||'#2fa7e8','#ffffff','#ffd84d']); }
+  if(win){ beep('win'); confetti([fxColor(),'#ffffff','#ffd84d',fxColor()], 160); }
   bindStamps();
   if($('again')) $('again').addEventListener('click', function(){ if(!R||!R.peer){ toLobby(); return; } G=null; R.meReady=true; R.net.send({t:'ready', r:true}); closeOv(); show('room'); renderRoom(); maybeStart(); });
   if($('sendReply')) $('sendReply').addEventListener('click', function(){ share(replyUrl, me().nm+'から 挑戦状の返事！ '+(win?'勝ったよ！':'次は負けない！')); });
@@ -795,7 +856,7 @@ function startGhost(ch, retry){
 function openChallenge(ch){
   show('lobby'); renderLobby();
   var t=teamOf(ch.a.m), hc=L.handicapFor(REC, ch.a.nm), seen=REC.seen['b'+ch.id+L.rivalKey(ch.a.nm)];
-  openOv('<p class="sub2">挑戦状が届いた！</p><h3 style="color:'+t.color+'">'+esc(ch.a.nm)+' からの挑戦</h3><p>'+cfgLabel(ch.c)+' ・ 3ラウンド × 3問</p>'+
+  openOv('<p class="sub2">挑戦状が届いた！</p><h3 style="color:'+t.color+'">'+esc(ch.a.nm)+' からの挑戦</h3><p>'+cfgLabel(ch.c)+' ・ 3ラウンド × '+L.PER+'問</p>'+
     '<p>相手のじゃんけんの手は かくれている。読んで勝て！</p>'+
     (hc.me?'<div class="vline s">あなたに +'+hc.me/1000+'秒ハンデ（勝ちこしているから）</div>':'')+(hc.opp?'<div class="vline s">'+esc(ch.a.nm)+' に +'+hc.opp/1000+'秒ハンデ</div>':'')+
     (seen?'<p>この挑戦状は もう受けたよ。もう一度やると練習になる</p>':'')+
@@ -961,7 +1022,7 @@ function onDigit(d, fromEl){
 }
 /** バトルではミスで2秒止まる。2回目のミスのあとは答えが自動で入る */
 function wrong(s, d){
-  S.wrong++; G.my.miss++;
+  S.wrong++; G.my.miss++; fxMiss();
   var t=targetCell(s); if(t){ t.classList.remove('wrong'); void t.offsetWidth; t.classList.add('wrong'); }
   var k=$('pad').querySelector('[data-d="'+d+'"]'); if(k){ k.classList.remove('ng'); void k.offsetWidth; k.classList.add('ng'); }
   beep('ng'); laneMiss('laneMe');
@@ -1002,7 +1063,7 @@ function correct(s, fromEl, auto){
     if(!G || !S.playing) return;
     apply(s);
     if(t){ t.classList.add('just'); setTimeout(function(){ t.classList.remove('just'); }, 320); }
-    if(!auto) beep('ok');
+    if(!auto) fxHit(t);
     S.idx++;
     if(S.idx>=S.steps.length){ problemDone(); return; }
     S.busy=false; renderStep(); sendProg();
@@ -1078,12 +1139,18 @@ window.addEventListener('pagehide', function(){ if(R && R.peer) try{ R.net.send(
 window.BATTLE={ answers:function(){ return S.steps.map(stepAnswer); }, next:function(){ var s=cur(); return s?stepAnswer(s):null; }, phase:function(){ return G ? {phase:G.phase||'', r:G.r, playing:S.playing, busy:S.busy, done:G.done} : null; }, state:function(){ return {G:G, R:R && {code:R.code, peer:R.peer, links:R.links}, playing:S.playing, busy:S.busy}; }, hand:function(h){ choose(h); } };
 $('soundBtn').setAttribute('aria-pressed', String(REC.sound));
 buildPad(); renderLobby(); show('lobby');
+/** 前のルール（1ラウンド3問）のリンクは使えないことを伝える */
+function oldOrBad(code, what){
+  var o=L.decode(code);
+  if(o && o.v===2){ show('lobby'); renderLobby(); openOv('<h3>前のルールの'+what+'</h3><p>1ラウンド3問のときの'+what+'なので、もう使えない。<br>新しく挑戦状を作ってもらおう（いまは1ラウンド5問）</p><div class="btns"><button class="btn" id="okOld">OK</button></div>'); $('okOld').addEventListener('click', closeOv); return; }
+  toast(what+'が読めなかった');
+}
 function route(){
   var h=location.hash.slice(1), q={}; h.split('&').forEach(function(kv){ var i=kv.indexOf('='); if(i>0) q[kv.slice(0,i)]=decodeURIComponent(kv.slice(i+1)); });
   if(q.m && !REC.m){ REC.m=teamOf(q.m).id; saveRec(); renderLobby(); }
   if(h) try{ history.replaceState(null, '', location.pathname); }catch(e){}
-  if(q.c){ var ch=L.readCode(q.c); if(ch && ch.k==='c') openChallenge(ch); else toast('挑戦状が読めなかった'); }
-  else if(q.r){ var rp=L.readCode(q.r); if(rp && rp.k==='r') openReply(rp); else toast('返事が読めなかった'); }
+  if(q.c){ var ch=L.readCode(q.c); if(ch && ch.k==='c') openChallenge(ch); else oldOrBad(q.c, '挑戦状'); }
+  else if(q.r){ var rp=L.readCode(q.r); if(rp && rp.k==='r') openReply(rp); else oldOrBad(q.r, '返事'); }
   else if(q.room && /^\d{4}$/.test(q.room)){ $('codeIn').value=q.room; if(REC.nm) openRoom(q.room, false); else { $('nameIn').focus(); toast('なまえを入れて「入る」を押してね'); } }}
 route();
 window.addEventListener('hashchange', function(){ if(!location.hash) return; if(G && !G.done) return; closeRoom(); G=null; stopPlay(); closeOv(); route(); });
