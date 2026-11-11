@@ -212,6 +212,78 @@
     return win === 'A' ? other : win === 'B' ? me : (prev || 'host');
   }
 
+  // ---------- ひとり練習（自己ベスト） ----------
+  function bestKey(cfg) { var c = cleanCfg(cfg); return c.op + '.' + c.dec + '.' + c.lv; }
+  function totalOf(sp) { return sp.reduce(function (s, row) { return s + row[PER - 1]; }, 0); }
+  /** 自己ベストを更新したら true。rec.best[key] = {sp, tot, at} */
+  function updateBest(rec, cfg, sp, now) {
+    rec.best = rec.best || {};
+    var k = bestKey(cfg), tot = totalOf(sp), b = rec.best[k];
+    if (b && b.tot <= tot) return false;
+    rec.best[k] = { sp: sp.map(function (r) { return r.slice(); }), tot: tot, at: now || 0 };
+    return true;
+  }
+
+  // ---------- 称号 ----------
+  var BADGES = [
+    { id: 'first', icon: '🎌', name: '初バトル', desc: 'はじめて対戦した' },
+    { id: 'win1', icon: '🥇', name: '初勝利', desc: 'はじめて勝った' },
+    { id: 'ws3', icon: '🔥', name: '3連勝', desc: '3回続けて勝った' },
+    { id: 'win10', icon: '🏅', name: '10勝', desc: '合計10回勝った' },
+    { id: 'comeback', icon: '🌪️', name: '大逆転', desc: '点で負けていたのに、試合に勝った' },
+    { id: 'j3', icon: '✊', name: 'じゃんけん名人', desc: '1試合でじゃんけん3連勝' },
+    { id: 'nomiss', icon: '💎', name: 'ノーミス勝利', desc: '1回もまちがえずに勝った' },
+    { id: 'shutout', icon: '🧱', name: '完封', desc: '4対0で勝った' },
+    { id: 'close', icon: '📸', name: '写真判定', desc: '0.5秒差以内でラウンドに勝った' },
+    { id: 'revenge', icon: '😤', name: 'リベンジ', desc: '前の試合で負けた相手に勝った' },
+    { id: 'never', icon: '🐢', name: 'ねばりづよい', desc: '5回負けても挑戦した' },
+    { id: 'rivals3', icon: '👥', name: 'ライバル3人', desc: '3人と対戦した' },
+    { id: 'ch', icon: '✉️', name: '挑戦状デビュー', desc: '挑戦状を作った' },
+    { id: 'solo', icon: '👻', name: 'ひとり練習', desc: '前の自分と勝負した' },
+    { id: 'best', icon: '⏱️', name: '自己ベスト更新', desc: 'ひとり練習で前の自分に勝った' },
+    { id: 'g20', icon: '🎮', name: 'バトル20回', desc: '20回対戦した' }
+  ];
+  /** 試合で起きたこと。m は自分を A にした match()、miss は自分のミス数、stBefore は試合前のその相手との連勝数（-なら連敗） */
+  function gameEvent(m, miss, stBefore) {
+    var res = m.win === 'A' ? 'win' : m.win ? 'lose' : 'draw', win = res === 'win';
+    var pa = 0, pb = 0, behind = false, close = false;
+    m.rounds.forEach(function (x, r) {
+      if (x.win === 'A') { pa += x.pts; if (x.timeB - x.timeA <= 500) close = true; } else if (x.win === 'B') pb += x.pts;
+      if (r < ROUNDS - 1 && pa < pb) behind = true;
+    });
+    return {
+      res: res, comeback: win && behind, j3: m.rounds.every(function (x) { return x.j === 1; }),
+      nomiss: win && !miss, shutout: win && m.ptsB === 0, close: close, revenge: win && stBefore < 0
+    };
+  }
+  /** 記録 rec.st に足す。ev は gameEvent() か {kind:'ch'} / {kind:'solo', best:true/false} */
+  function addEvent(rec, ev) {
+    var st = rec.st = rec.st || {};
+    function inc(k) { st[k] = (st[k] || 0) + 1; }
+    if (ev.kind === 'ch') { inc('ch'); return st; }
+    if (ev.kind === 'solo') { inc('solo'); if (ev.best) inc('best'); return st; }
+    inc('g');
+    if (ev.res === 'win') { inc('w'); st.ws = (st.ws || 0) + 1; st.wsMax = Math.max(st.wsMax || 0, st.ws); }
+    else { st.ws = 0; if (ev.res === 'lose') inc('l'); }
+    ['comeback', 'j3', 'nomiss', 'shutout', 'close', 'revenge'].forEach(function (k) { if (ev[k]) inc(k); });
+    return st;
+  }
+  function earnedIds(rec) {
+    var s = rec.st || {}, n = function (k) { return s[k] || 0; }, rv = Object.keys(rec.rivals || {}).length;
+    var ok = {
+      first: n('g') >= 1, win1: n('w') >= 1, ws3: n('wsMax') >= 3, win10: n('w') >= 10, comeback: n('comeback') >= 1,
+      j3: n('j3') >= 1, nomiss: n('nomiss') >= 1, shutout: n('shutout') >= 1, close: n('close') >= 1, revenge: n('revenge') >= 1,
+      never: n('l') >= 5, rivals3: rv >= 3, ch: n('ch') >= 1, solo: n('solo') >= 1, best: n('best') >= 1, g20: n('g') >= 20
+    };
+    return BADGES.filter(function (b) { return ok[b.id]; }).map(function (b) { return b.id; });
+  }
+  /** まだ持っていない称号を rec.bd に入れて、新しく取れたものを返す */
+  function takeBadges(rec, now) {
+    rec.bd = rec.bd || {};
+    return earnedIds(rec).filter(function (id) { if (rec.bd[id]) return false; rec.bd[id] = now || 1; return true; })
+      .map(function (id) { return BADGES.filter(function (b) { return b.id === id; })[0]; });
+  }
+
   /** 試合後のひとこと。m は match() の結果、side は自分が 'A' か 'B' か、rival は addResult 後の記録 */
   function verdict(m, side, rival) {
     var me = side, res = m.win === me ? 'win' : m.win ? 'lose' : 'draw', lines = [];
@@ -240,6 +312,8 @@
     encode: encode, decode: decode, cleanName: cleanName, cleanPlayer: cleanPlayer,
     makeChallenge: makeChallenge, makeReply: makeReply, readCode: readCode,
     rivalKey: rivalKey, addResult: addResult, verdict: verdict,
-    addHands: addHands, habit: habit, chooserAfter: chooserAfter
+    addHands: addHands, habit: habit, chooserAfter: chooserAfter,
+    bestKey: bestKey, totalOf: totalOf, updateBest: updateBest,
+    BADGES: BADGES, gameEvent: gameEvent, addEvent: addEvent, earnedIds: earnedIds, takeBadges: takeBadges
   };
 });

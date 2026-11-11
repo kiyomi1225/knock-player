@@ -239,6 +239,21 @@ main{display:flex;flex-direction:column;align-items:center;gap:10px;min-height:0
 .habit .hb span.top{border-color:var(--opp)}
 .habit.s{font-size:12px;color:#7a8299;background:none;padding:0}
 .chooseNote{color:#ffd84d;font-weight:800}
+.solo{margin-top:14px}
+.solo .row2{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.solo .status{flex:1;min-width:10em}
+.badges{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.bd{display:grid;grid-template-columns:auto 1fr;gap:0 8px;align-items:center;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.05);opacity:.45}
+.bd span{grid-row:1 / 3;font-size:26px;line-height:1;filter:grayscale(1)}
+.bd b{font-size:13px} .bd small{font-size:11px;color:var(--on-dark-muted);line-height:1.3}
+.bd.on{opacity:1;background:rgba(255,216,77,.14);box-shadow:inset 0 0 0 1px rgba(255,216,77,.5)} .bd.on span{filter:none}
+.newBadges{width:100%;max-width:420px;display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.newBadges .nbT{font-family:var(--font-talk);font-size:22px;color:#e0a400;text-align:center;animation:pop .5s ease}
+.newBadges .nb{display:grid;grid-template-columns:auto 1fr;gap:0 10px;align-items:center;text-align:left;background:linear-gradient(90deg,#fff6d1,#ffe9a8);border-radius:14px;padding:8px 14px;animation:cardpop .6s cubic-bezier(.3,1.6,.5,1) both}
+.newBadges .nb span{grid-row:1 / 3;font-size:34px;line-height:1}
+.newBadges .nb b{font-size:16px;color:var(--pencil)} .newBadges .nb small{font-size:12px;color:#7a6a3a}
+@keyframes cardpop{0%{transform:scale(.3) rotate(-8deg);opacity:0}100%{transform:none;opacity:1}}
+
 .reveal{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:center;width:100%;max-width:420px}
 .reveal .side{display:flex;flex-direction:column;align-items:center;gap:4px}
 .reveal .hand{font-size:clamp(64px,18vw,96px);line-height:1;animation:pop .4s ease}
@@ -297,6 +312,12 @@ table.rt .dl{font-size:11px;color:var(--ng);display:block}
         <button class="btn big" id="makeCh">挑戦状を作る</button>
       </section>
     </div>
+    <section class="panel mcard solo">
+      <h2><span class="em">👻</span>ひとり練習</h2>
+      <p>前のいちばん速い自分（ゴースト）と勝負。じゃんけんなしで 3ラウンド × 5問。対戦や挑戦状のタイムも自己ベストになる。</p>
+      <div class="cfg" id="soloCfg"></div>
+      <div class="row2"><span class="status" id="soloBest"></span><button class="btn big" id="soloBtn">前の自分と勝負</button></div>
+    </section>
     <section class="panel">
       <details id="rulesBox"><summary>ルール</summary>
         <ol class="rules">
@@ -314,6 +335,10 @@ table.rt .dl{font-size:11px;color:var(--ng);display:block}
     <section class="panel" id="rivalBox">
       <h2>ライバル<span class="r" id="rivalSum"></span></h2>
       <div class="rivals" id="rivals"></div>
+    </section>
+    <section class="panel">
+      <h2>称号<span class="r" id="badgeSum"></span></h2>
+      <div class="badges" id="badges"></div>
     </section>
   </div>
 </div>
@@ -397,7 +422,7 @@ function cfgLabel(c){ return OPNAME[c.op]+'・'+(c.dec?'小数':'整数')+'・'+
 
 // ---------- 記録（この端末だけ） ----------
 var REC=(function(){ var o=null; try{ o=JSON.parse(localStorage.getItem('kb.p')); }catch(e){} o=o||{};
-  o.nm=o.nm||''; o.m=o.m||''; o.rivals=o.rivals||{}; o.seen=o.seen||{}; o.cfg=o.cfg||{op:'add',dec:0,lv:2}; o.sound=!!o.sound; return o; })();
+  o.nm=o.nm||''; o.m=o.m||''; o.rivals=o.rivals||{}; o.seen=o.seen||{}; o.cfg=o.cfg||{op:'add',dec:0,lv:2}; o.sound=!!o.sound; o.best=o.best||{}; o.st=o.st||{}; o.bd=o.bd||{}; return o; })();
 function saveRec(){ try{ localStorage.setItem('kb.p', JSON.stringify(REC)); }catch(e){} }
 function me(){ return {nm:L.cleanName(REC.nm), m:REC.m||'chigusa'}; }
 
@@ -491,7 +516,13 @@ function cfgPicker(el, c, onChange){
 function renderLobby(){
   $('nameIn').value=REC.nm;
   $('teams').innerHTML=TEAMS.map(function(t){ return '<button class="team" data-id="'+t.id+'" style="--c:'+t.color+'" aria-pressed="'+(REC.m===t.id)+'"><i></i>'+t.name+'</button>'; }).join('');
-  cfgPicker($('chCfg'), REC.cfg, function(c){ REC.cfg={op:c.op,dec:c.dec,lv:c.lv}; saveRec(); });
+  function setCfg(c){ REC.cfg={op:c.op,dec:c.dec,lv:c.lv}; saveRec(); renderLobby(); }
+  cfgPicker($('chCfg'), REC.cfg, setCfg); cfgPicker($('soloCfg'), REC.cfg, setCfg);
+  var bst=REC.best[L.bestKey(REC.cfg)];
+  $('soloBest').textContent = bst ? cfgLabel(REC.cfg)+' の自己ベスト '+sec(bst.tot)+' 秒' : cfgLabel(REC.cfg)+' はまだ記録なし。1回目がゴーストになる';
+  var have=L.BADGES.filter(function(b){ return REC.bd[b.id]; }).length;
+  $('badgeSum').textContent=have+' / '+L.BADGES.length;
+  $('badges').innerHTML=L.BADGES.map(function(b){ return '<div class="bd'+(REC.bd[b.id]?' on':'')+'"><span>'+b.icon+'</span><b>'+b.name+'</b><small>'+b.desc+'</small></div>'; }).join('');
   var ks=Object.keys(REC.rivals).sort(function(a,b){ return (REC.rivals[b].last||0)-(REC.rivals[a].last||0); });
   $('rivalBox').hidden=!ks.length;
   var tw=0, tl=0;
@@ -515,6 +546,7 @@ $('joinRoom').addEventListener('click', function(){
   var c=$('codeIn').value.replace(/\D/g,''); if(c.length!==4){ var i=$('codeIn'); i.classList.remove('bad'); void i.offsetWidth; i.classList.add('bad'); return; }
   if(needName()) openRoom(c, false);
 });
+$('soloBtn').addEventListener('click', function(){ if(needName()) startSolo(); });
 $('makeCh').addEventListener('click', function(){ if(needName()) startGame({kind:'create', cfg:Object.assign({}, REC.cfg, {seed:L.randomSeed()}), hc:{me:0, opp:0}, opp:null}); });
 
 // ---------- へや（リアルタイム） ----------
@@ -615,13 +647,20 @@ function startGame(o){
   if(G.opp && G.opp.m===m.m) oc='#ffffff';
   document.documentElement.style.setProperty('--opp', oc);
   $('laneOpp').hidden=!G.opp; $('scoreBox').hidden=!G.opp;
-  if(G.opp){ $('lnOpp').textContent=G.opp.nm+(G.kind==='ghost'?'👻':''); $('laneOpp').style.setProperty('--c', oc); }
+  if(G.opp){ $('lnOpp').textContent=G.opp.nm+(G.kind==='ghost'||G.kind==='solo'?'👻':''); $('laneOpp').style.setProperty('--c', oc); }
+  if(G.kind==='solo') $('scoreBox').hidden=true;
   closeOv(); show('play'); $('pad').classList.toggle('dec', !!G.cfg.dec);
   S.playing=false; $('pad').classList.add('dim'); $('grid').innerHTML=''; hideHint(); $('qno').textContent='';
-  updateBar(); jankenPick();
+  updateBar(); if(G.kind==='solo') soloRound(); else jankenPick();
 }
+/** ひとり練習: 自己ベストの記録がゴースト。じゃんけんなし */
+function startSolo(){
+  var cfg=Object.assign({}, REC.cfg, {seed:L.randomSeed()}), b=REC.best[L.bestKey(cfg)];
+  startGame({kind:'solo', cfg:cfg, hc:{me:0, opp:0}, opp: b ? {nm:'ベスト', m:me().m} : null, ghost: b ? {h:['g','g','g'], sp:b.sp} : null});
+}
+function soloRound(){ G.revealed=G.r; G.delay={me:0, opp:0}; countdown(); }
 function updateBar(){
-  $('rLabel').textContent='ラウンド '+(G.r+1)+'/3'; $('rPts').textContent= G.kind==='create' ? '' : (G.r===2 ? '最終ラウンド 2点！' : '1点');
+  $('rLabel').textContent='ラウンド '+(G.r+1)+'/3'; $('rPts').textContent= G.kind==='create'||G.kind==='solo' ? '' : (G.r===2 ? '最終ラウンド 2点！' : '1点');
   $('scMe').textContent=G.pts.me; $('scOpp').textContent=G.pts.opp;
 }
 function histHtml(){
@@ -716,7 +755,7 @@ function tick(){
   setLane('laneMe', mine, G.phase==='play' && t<G.delay.me ? 'まって…' : '');
   if(G.opp){
     var v, tag='';
-    if(G.kind==='ghost'){ v=L.ghostProgress(G.opd.sp[G.r], G.delay.opp, t); if(t<G.delay.opp) tag='まって…'; }
+    if(G.kind==='ghost'||G.kind==='solo'){ v=L.ghostProgress(G.opd.sp[G.r], G.delay.opp, t); if(t<G.delay.opp) tag='まって…'; }
     else { v=G.oppProg[G.r]||0; if(t<G.delay.opp && v===0) tag='まって…'; }
     setLane('laneOpp', v, tag);
     var lead = mine>v+0.05 ? 1 : v>mine+0.05 ? -1 : 0;
@@ -763,6 +802,7 @@ function roundDone(){
 function checkRoundEnd(){
   if(!G || G.phase!=='wait') return;
   var r=G.r;
+  if(G.kind==='solo'){ G.phase='res'; setTimeout(soloRoundResult, 600); return; }
   if(G.kind==='create'){ G.phase='res'; setTimeout(function(){ roundResult(null); }, 600); return; }
   if(!G.opd.sp[r]) return;
   G.phase='res';
@@ -809,22 +849,33 @@ function goNext(){
 }
 function maybeNext(){ var r=G.r; if(G.phase==='res' && G.nx.me[r] && G.nx.opp[r] && G.advanced!==r){ G.advanced=r; nextRound(); } }
 function bindStamps(){ var st=$('ovStamps'); if(st) st.addEventListener('click', function(ev){ var b=ev.target.closest('button'); if(b) sendStamp(b.dataset.s, st); }); }
+function soloRoundResult(){
+  clearInterval(laneTimer);
+  var r=G.r, last=r===L.ROUNDS-1, t=G.my.sp[r][L.PER-1], g=G.opd.sp[r] ? G.opd.sp[r][L.PER-1] : 0, d=t-g;
+  var say = !g ? '' : d<0 ? 'ベストより '+sec(-d)+'秒 はやい！' : d===0 ? 'ベストと同じ！' : 'ベストより '+sec(d)+'秒 おそい';
+  openOv('<p class="sub2">ラウンド '+(r+1)+'</p><div class="bigScore">'+sec(t)+' 秒</div>'+(say?'<div class="vline">'+say+'</div>':'')+
+    '<div class="btns"><button class="btn" id="nextR">'+(last?'結果へ':'次のラウンドへ')+'</button></div>');
+  if(g && d<0){ beep('win'); confetti([fxColor(),'#ffffff','#ffd84d'], 50); }
+  $('nextR').addEventListener('click', nextRound);
+}
 function nextRound(){
   if(G.r>=2){ finish(); return; }
   G.r++; G.phase='idle'; G.lastLead=0; updateBar(); setLane('laneMe',0,''); if(G.opp) setLane('laneOpp',0,'');
-  $('grid').innerHTML=''; hideHint(); $('qno').textContent=''; jankenPick();
+  $('grid').innerHTML=''; hideHint(); $('qno').textContent=''; if(G.kind==='solo') soloRound(); else jankenPick();
 }
 
 // ---------- 結果 ----------
 function finish(){
   G.done=true; stopPlay();
-  var my={nm:me().nm, m:me().m, h:G.my.h, sp:G.my.sp, miss:G.my.miss};
+  var my={nm:me().nm, m:me().m, h:G.my.h, sp:G.my.sp, miss:G.my.miss}, now=Date.now();
+  if(G.kind==='solo'){ soloFinish(now); return; }
   if(G.kind==='create'){
+    L.updateBest(REC, G.cfg, G.my.sp, now); L.addEvent(REC, {kind:'ch'}); var nbc=L.takeBadges(REC, now); saveRec();
     G.chId=Math.random().toString(36).slice(2,10);
     var code=L.makeChallenge(G.cfg, my, G.chId), url=BASE+'#c='+code, tot=G.my.sp.reduce(function(s,a){ return s+a[L.PER-1]; },0);
     openOv('<h3>挑戦状ができた！</h3><div class="bigScore">'+sec(tot)+' 秒</div><p>'+cfgLabel(G.cfg)+' ・ じゃんけんの手 '+G.my.h.map(function(h){ return L.HAND_ICON[h]; }).join(' ')+'（相手には見えない）</p>'+
       '<p>リンクを友だちに送ろう。友だちがあなたのゴーストと勝負して、返事のリンクを送り返してくれる。</p>'+
-      '<div class="btns"><button class="btn hot big" id="shareCh">挑戦状を送る</button></div><textarea class="shareBox" rows="3" hidden readonly></textarea>'+
+      badgeHtml(nbc)+'<div class="btns"><button class="btn hot big" id="shareCh">挑戦状を送る</button></div><textarea class="shareBox" rows="3" hidden readonly></textarea>'+
       '<div class="btns"><button class="btn sub" id="againCh">作りなおす</button><button class="btn sub" id="toLobby">ロビーへ</button></div>');
     $('shareCh').addEventListener('click', function(){ share(url, me().nm+'から 筆算バトルの挑戦状！（'+cfgLabel(G.cfg)+'）'); });
     $('againCh').addEventListener('click', function(){ startGame({kind:'create', cfg:Object.assign({}, G.cfg, {seed:L.randomSeed()}), hc:{me:0,opp:0}, opp:null}); });
@@ -833,14 +884,14 @@ function finish(){
   }
   var mt=L.match(G.my, G.opd, {op:G.cfg.op, hcA:G.hc.me, hcB:G.hc.opp});
   var key = G.kind==='live' ? null : 'b'+G.ch.id+L.rivalKey(G.opp.nm);
-  var rival;
+  var rival, nb=[];
   if(key && REC.seen[key]) rival=REC.rivals[L.rivalKey(G.opp.nm)];
-  else { rival=L.addResult(REC, G.opp.nm, G.opp.m, mt.win==='A'?'win':mt.win?'lose':'draw'); L.addHands(REC, G.opp.nm, G.opd.h); if(key) REC.seen[key]=1; saveRec(); }
+  else { var stB=(REC.rivals[L.rivalKey(G.opp.nm)]||{}).st||0; L.addEvent(REC, L.gameEvent(mt, G.my.miss, stB)); L.updateBest(REC, G.cfg, G.my.sp, now); rival=L.addResult(REC, G.opp.nm, G.opp.m, mt.win==='A'?'win':mt.win?'lose':'draw'); L.addHands(REC, G.opp.nm, G.opd.h); if(key) REC.seen[key]=1; nb=L.takeBadges(REC, now); saveRec(); }
   if(G.kind==='live' && R && mt.win){ R.chooser=L.chooserAfter(mt.win, myRole(), R.chooser); R.why='lose'; }
   var replyUrl = G.kind==='ghost' ? BASE+'#r='+L.makeReply(G.ch, my, {a:G.hc.opp, b:G.hc.me}) : '';
-  finalView(mt, G.opp, rival, G.kind, replyUrl, key && REC.seen[key] && G.retry);
+  finalView(mt, G.opp, rival, G.kind, replyUrl, key && REC.seen[key] && G.retry, nb);
 }
-function finalView(mt, opp, rival, kind, replyUrl, practice){
+function finalView(mt, opp, rival, kind, replyUrl, practice, nb){
   var v=L.verdict(mt, 'A', rival), win=v.res==='win';
   var nextHc=L.handicapFor(REC, opp.nm), hcl=[];
   if(nextHc.me) hcl.push('次は あなたに +'+nextHc.me/1000+'秒ハンデ'); if(nextHc.opp) hcl.push('次は '+esc(opp.nm)+' に +'+nextHc.opp/1000+'秒ハンデ');
@@ -853,6 +904,7 @@ function finalView(mt, opp, rival, kind, replyUrl, practice){
     '<table class="rt"><tr><th></th><th>あなた / '+esc(opp.nm)+'</th><th>あなた</th><th>'+esc(opp.nm)+'</th></tr>'+rows+
     '<tr><td>合計</td><td></td><td>'+sec(mt.totalA)+'</td><td>'+sec(mt.totalB)+'</td></tr></table>'+
     (st?'<div class="recl">'+st+(practice?'（2回目からは練習。記録は最初の1回だけ）':'')+'</div>':'')+(hcl.length?'<div class="vline s">'+hcl.join(' ・ ')+'</div>':'')+
+    badgeHtml(nb)+
     (kind==='live' && mt.win ? '<div class="vline s chooseNote">'+(win ? '次の問題は '+esc(opp.nm)+' が選ぶ' : '次の問題は あなたが選べる！')+'</div>' : '')+
     (kind==='live'?'<div class="stamps" id="ovStamps">'+stampBtns()+'</div>':'')+
     '<div class="btns">'+
@@ -866,6 +918,26 @@ function finalView(mt, opp, rival, kind, replyUrl, practice){
   if($('sendReply')) $('sendReply').addEventListener('click', function(){ share(replyUrl, me().nm+'から 挑戦状の返事！ '+(win?'勝ったよ！':'次は負けない！')); });
   if($('retry')) $('retry').addEventListener('click', function(){ var c=G.ch; startGhost(c, true); });
   if($('revenge')) $('revenge').addEventListener('click', function(){ if(mt.cfg) REC.cfg={op:mt.cfg.op, dec:mt.cfg.dec, lv:mt.cfg.lv}; saveRec(); toLobby(); $('makeCh').click(); });
+  $('toLobby').addEventListener('click', toLobby);
+}
+/** 新しく取れた称号 */
+function badgeHtml(nb){
+  if(!nb || !nb.length) return '';
+  setTimeout(function(){ beep('up'); }, 500);
+  return '<div class="newBadges"><div class="nbT">称号ゲット！</div>'+nb.map(function(b, i){ return '<div class="nb" style="animation-delay:'+(0.3+i*0.25)+'s"><span>'+b.icon+'</span><b>'+b.name+'</b><small>'+b.desc+'</small></div>'; }).join('')+'</div>';
+}
+function soloFinish(now){
+  var tot=L.totalOf(G.my.sp), prev=REC.best[L.bestKey(G.cfg)], isBest=L.updateBest(REC, G.cfg, G.my.sp, now);
+  L.addEvent(REC, {kind:'solo', best: isBest && !!prev}); var nb=L.takeBadges(REC, now); saveRec();
+  var rows=G.my.sp.map(function(row, r){ var t=row[L.PER-1], g=prev ? prev.sp[r][L.PER-1] : 0;
+    return '<tr><td>R'+(r+1)+'</td><td class="'+(prev && t<g ? 'w' : '')+'">'+sec(t)+'</td><td>'+(prev ? sec(g) : '-')+'</td></tr>'; }).join('');
+  openOv('<div class="res '+(isBest ? 'win' : '')+'">'+(!prev ? '記録ができた！' : isBest ? 'ベスト更新！！' : 'ベストまで あと '+sec(tot-prev.tot)+'秒')+'</div>'+
+    '<div class="bigScore">'+sec(tot)+' 秒</div>'+
+    (prev ? '<div class="vline s">前のベスト '+sec(prev.tot)+' 秒'+(isBest ? '（'+sec(prev.tot-tot)+'秒 ちぢめた）' : '')+'</div>' : '<div class="vline s">次からは この記録がゴーストになる</div>')+
+    '<table class="rt"><tr><th></th><th>今回</th><th>ベスト</th></tr>'+rows+'</table>'+badgeHtml(nb)+
+    '<div class="btns"><button class="btn hot big" id="soloAgain">もう1回！</button><button class="btn sub" id="toLobby">ロビーへ</button></div>');
+  if(isBest && prev){ beep('win'); confetti([fxColor(),'#ffffff','#ffd84d',fxColor()], 160); }
+  $('soloAgain').addEventListener('click', startSolo);
   $('toLobby').addEventListener('click', toLobby);
 }
 function toLobby(){ if(G && G.kind==='live'){ closeRoom(); } G=null; stopPlay(); closeOv(); show('lobby'); renderLobby(); }
@@ -894,12 +966,12 @@ function openChallenge(ch){
 function openReply(rp){
   show('lobby');
   var mt=L.match(rp.a, rp.b, {op:rp.c.op, hcA:rp.hc.a, hcB:rp.hc.b}); mt.cfg=rp.c;
-  var key='a'+rp.id+L.rivalKey(rp.b.nm), rival;
+  var key='a'+rp.id+L.rivalKey(rp.b.nm), rival, nb=[];
   if(REC.seen[key]) rival=REC.rivals[L.rivalKey(rp.b.nm)];
-  else { rival=L.addResult(REC, rp.b.nm, rp.b.m, mt.win==='A'?'win':mt.win?'lose':'draw'); L.addHands(REC, rp.b.nm, rp.b.h); REC.seen[key]=1; saveRec(); }
+  else { var stB=(REC.rivals[L.rivalKey(rp.b.nm)]||{}).st||0; L.addEvent(REC, L.gameEvent(mt, rp.a.miss, stB)); rival=L.addResult(REC, rp.b.nm, rp.b.m, mt.win==='A'?'win':mt.win?'lose':'draw'); L.addHands(REC, rp.b.nm, rp.b.h); REC.seen[key]=1; nb=L.takeBadges(REC, Date.now()); saveRec(); }
   renderLobby();
   document.documentElement.style.setProperty('--me', teamOf(rp.a.m).color); document.documentElement.style.setProperty('--opp', teamOf(rp.b.m).color);
-  finalView(mt, {nm:rp.b.nm, m:rp.b.m}, rival, 'reply', '', false);
+  finalView(mt, {nm:rp.b.nm, m:rp.b.m}, rival, 'reply', '', false, nb);
   var h=document.createElement('p'); h.className='sub2'; h.textContent=rp.b.nm+' が あなたの挑戦状に こたえた！'; $('ov').querySelector('.card').prepend(h);
 }
 
