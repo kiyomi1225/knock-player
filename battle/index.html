@@ -275,6 +275,9 @@ table.rt td.w{background:#fff7d6;font-weight:800}
 table.rt .dl{font-size:11px;color:var(--ng);display:block}
 .recl{font-size:14px;color:var(--ink);background:#f3f5f9;border-radius:12px;padding:8px 14px}
 .btns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.mvLead{font-size:13px;color:var(--on-dark-muted);margin:0 0 8px} .mvH{display:block;margin:10px 0 6px;font-size:14px}
+.shareBox.mv{font:12px var(--font-num);word-break:break-all}
+.mvMsg{font-size:13px;margin-top:8px} .mvMsg .bad,.mvMsg.bad{color:#ff8a80}
 .shareBox{width:100%;font:13px var(--font-ui);padding:8px;border-radius:10px;border:2px solid var(--line);box-sizing:border-box;color:var(--ink)}
 .toast{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:90;pointer-events:none;font-family:var(--font-talk);font-size:clamp(36px,8vmin,70px);white-space:nowrap;
   background:var(--rainbow);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 #fff) drop-shadow(0 6px 14px rgba(0,0,0,.45));opacity:0}
@@ -340,6 +343,18 @@ table.rt .dl{font-size:11px;color:var(--ng);display:block}
       <h2>称号<span class="r" id="badgeSum"></span></h2>
       <div class="badges" id="badges"></div>
     </section>
+    <section class="panel">
+      <details id="moveDet"><summary>記録の引っ越し（べつの端末へ）</summary>
+        <p class="mvLead">名前・チーム・ライバルの成績・じゃんけんのくせ・自己ベスト・称号を、べつの端末（iPad ↔ スマホ）へ移す。</p>
+        <b class="mvH">① この端末の記録をコードにする</b>
+        <textarea class="shareBox mv" id="mvOut" rows="4" readonly></textarea>
+        <div class="row"><button class="btn" id="mvCopy">コピー</button><button class="btn ghostb" id="mvShare">送る</button></div>
+        <b class="mvH">② べつの端末で、コードを読みこむ</b>
+        <textarea class="shareBox mv" id="mvIn" rows="4" placeholder="ここにコードをはりつける"></textarea>
+        <div class="row"><button class="btn" id="mvRead">読みこむ</button></div>
+        <div class="mvMsg" id="mvMsg"></div>
+      </details>
+    </section>
   </div>
 </div>
 
@@ -389,12 +404,13 @@ table.rt .dl{font-size:11px;color:var(--ng);display:block}
 <canvas id="confetti" aria-hidden="true"></canvas>
 
 <script src="core.js"></script>
+<script src="skills.js"></script>
 <script src="logic.js"></script>
 <script src="net.js"></script>
 <script>
 (function(){
 'use strict';
-var C=window.HissanCore, L=window.BattleLogic, N=window.BattleNet;
+var C=window.HissanCore, L=window.BattleLogic, N=window.BattleNet; var K=window.HissanSkills;
 var $=function(id){ return document.getElementById(id); };
 var reduced=window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 var TEAMS=[
@@ -1129,7 +1145,7 @@ function wrong(s, d){
 }
 function explain(s){
   var op=S.p.op, dd=dinfo(S.p);
-  if(s.type==='quot') return s.r+' ÷ '+s.b+' → '+s.b+' × □ が '+s.r+' をこえない いちばん大きい数';
+  if(s.type==='quot'){ var gq=K.divGuess(s.r, s.b); return s.r+' ÷ '+s.b+' → '+(gq && gq.b10 ? '見当: '+s.b+' を '+gq.b10+' とみると だいたい '+gq.g+'。' : '')+s.b+' × □ が '+s.r+' をこえない いちばん大きい数'; }
   if(s.type==='prod') return s.q+' × '+s.b+' = '+s.p;
   if(s.type==='diff') return s.r+' − '+s.p+' = '+s.diff;
   if(s.type==='down') return '次の '+s.answer+' をおろす';
@@ -1231,6 +1247,24 @@ document.addEventListener('keydown', function(ev){
 
 // ---------- 起動 ----------
 window.addEventListener('pagehide', function(){ if(R && R.peer) try{ R.net.send({t:'bye'}); }catch(e){} });
+
+// ---------- 記録の引っ越し（べつの端末へ） ----------
+function dayKey(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function recSummary(o){ o=o||{}; return (o.nm ? L.cleanName(o.nm) : '名前なし')+' ・ ライバル '+Object.keys(o.rivals||{}).length+' 人 ・ 称号 '+Object.keys(o.bd||{}).length+' こ'; }
+function mvMsg(t, bad){ var m=$('mvMsg'); m.textContent=t; m.className='mvMsg'+(bad?' bad':''); }
+$('moveDet').addEventListener('toggle', function(){ if($('moveDet').open) $('mvOut').value=K.packBackup('battle', {'kb.p': JSON.stringify(REC)}, dayKey()); });
+$('mvCopy').addEventListener('click', function(){ var t=$('mvOut'); t.select(); var ok=false; try{ ok=document.execCommand('copy'); }catch(e){}
+  try{ navigator.clipboard.writeText(t.value).then(function(){ mvMsg('コピーした！ べつの端末の②にはりつけてね'); }, function(){ if(!ok) mvMsg('コピーできなかった。上の文字を長押しして全部コピーしてね', true); }); }catch(e){}
+  if(ok) mvMsg('コピーした！ べつの端末の②にはりつけてね'); });
+$('mvShare').addEventListener('click', function(){ var t=$('mvOut').value; if(navigator.share) navigator.share({title:'筆算バトルの記録', text:t}).catch(function(){}); else { $('mvOut').select(); mvMsg('この端末では送れない。コピーしてね', true); } });
+$('mvRead').addEventListener('click', function(){
+  var r=K.unpackBackup('battle', $('mvIn').value), o=null;
+  if(r.ok){ try{ o=JSON.parse(r.data.keys['kb.p']); }catch(e){} }
+  if(!r.ok || !o || typeof o!=='object'){ mvMsg(r.ok ? 'コードが読めなかった' : r.err, true); return; }
+  var m=$('mvMsg'); m.className='mvMsg';
+  m.innerHTML='<p>読みこむ記録: '+esc(recSummary(o))+'</p><p class="bad">いまのこの端末のバトルの記録は消えて、読みこんだ記録に置きかわる。</p><div class="row"><button class="btn" id="mvDo" style="background:var(--ng);color:#fff">置きかえる</button></div>';
+  $('mvDo').addEventListener('click', function(){ try{ localStorage.setItem('kb.p', r.data.keys['kb.p']); }catch(e){ mvMsg('保存できなかった（ブラウザの設定を確かめてね）', true); return; } location.hash=''; location.reload(); });
+});
 window.BATTLE={ answers:function(){ return S.steps.map(stepAnswer); }, next:function(){ var s=cur(); return s?stepAnswer(s):null; }, phase:function(){ return G ? {phase:G.phase||'', r:G.r, playing:S.playing, busy:S.busy, done:G.done} : null; }, state:function(){ return {G:G, R:R && {code:R.code, peer:R.peer, links:R.links, meReady:R.meReady, peerReady:R.peerReady, chooser:R.chooser}, playing:S.playing, busy:S.busy}; }, hand:function(h){ choose(h); } };
 $('soundBtn').setAttribute('aria-pressed', String(REC.sound));
 buildPad(); renderLobby(); show('lobby');
