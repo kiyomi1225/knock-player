@@ -180,6 +180,38 @@
     return r;
   }
 
+  // ---------- じゃんけんのくせ ----------
+  /** 相手が出した手を記録に足す（rec.rivals[相手].hd = {g,c,p}）。addResult のあとに呼ぶ */
+  function addHands(rec, oppName, hands) {
+    var r = rec.rivals && rec.rivals[rivalKey(oppName)]; if (!r) return null;
+    r.hd = r.hd || { g: 0, c: 0, p: 0 };
+    (hands || []).forEach(function (h) { if (HANDS.indexOf(h) >= 0) r.hd[h]++; });
+    return r.hd;
+  }
+  /** くせ: これまでの手（hd）と、この試合で出た手（extra）を合わせた割合。3回未満なら null。
+   *  pct は整数で合計100（端数はいちばん多い手に足す）、top はいちばん多い手（同じならなし） */
+  function habit(hd, extra) {
+    var c = { g: 0, c: 0, p: 0 };
+    HANDS.forEach(function (h) { c[h] = (hd && hd[h] | 0) || 0; });
+    (extra || []).forEach(function (h) { if (HANDS.indexOf(h) >= 0) c[h]++; });
+    var n = c.g + c.c + c.p; if (n < 3) return null;
+    var pct = {}, sum = 0, max = -1, top = '', tie = false;
+    HANDS.forEach(function (h) {
+      pct[h] = Math.floor(c[h] * 100 / n); sum += pct[h];
+      if (c[h] > max) { max = c[h]; top = h; tie = false; } else if (c[h] === max) tie = true;
+    });
+    pct[top] += 100 - sum;
+    return { n: n, cnt: c, pct: pct, top: tie ? '' : top };
+  }
+
+  // ---------- 次の問題を選ぶ人 ----------
+  /** リアルタイム対戦: 負けた人が次の問題を選ぶ。win は自分を A にした結果、me は自分の役（'host'/'guest'）。
+   *  引き分けは prev のまま */
+  function chooserAfter(win, me, prev) {
+    var other = me === 'host' ? 'guest' : 'host';
+    return win === 'A' ? other : win === 'B' ? me : (prev || 'host');
+  }
+
   /** 試合後のひとこと。m は match() の結果、side は自分が 'A' か 'B' か、rival は addResult 後の記録 */
   function verdict(m, side, rival) {
     var me = side, res = m.win === me ? 'win' : m.win ? 'lose' : 'draw', lines = [];
@@ -207,6 +239,7 @@
     janken: janken, handicapMs: handicapMs, handicapFor: handicapFor, roundResult: roundResult, match: match, ghostProgress: ghostProgress,
     encode: encode, decode: decode, cleanName: cleanName, cleanPlayer: cleanPlayer,
     makeChallenge: makeChallenge, makeReply: makeReply, readCode: readCode,
-    rivalKey: rivalKey, addResult: addResult, verdict: verdict
+    rivalKey: rivalKey, addResult: addResult, verdict: verdict,
+    addHands: addHands, habit: habit, chooserAfter: chooserAfter
   };
 });

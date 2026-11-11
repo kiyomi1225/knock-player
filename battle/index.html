@@ -232,6 +232,13 @@ main{display:flex;flex-direction:column;align-items:center;gap:10px;min-height:0
 .tbar i{display:block;height:100%;background:var(--accent);width:100%;transition:width .2s linear}
 .hist{font-size:13px;color:var(--pencil);display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
 .hist span{background:#f3f5f9;border-radius:10px;padding:3px 10px}
+.habit{width:100%;max-width:380px;background:#f3f5f9;border-radius:14px;padding:8px 12px;font-size:13px;color:var(--pencil)}
+.habit b{color:var(--opp)} .habit small{color:#7a8299}
+.habit .hb{display:flex;gap:8px;justify-content:center;margin-top:6px}
+.habit .hb span{flex:1;border-radius:10px;padding:4px 0;font-family:var(--font-num);font-weight:800;font-size:15px;background:linear-gradient(90deg,rgba(240,106,181,.28) var(--w),#fff var(--w));border:2px solid transparent}
+.habit .hb span.top{border-color:var(--opp)}
+.habit.s{font-size:12px;color:#7a8299;background:none;padding:0}
+.chooseNote{color:#ffd84d;font-weight:800}
 .reveal{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:center;width:100%;max-width:420px}
 .reveal .side{display:flex;flex-direction:column;align-items:center;gap:4px}
 .reveal .hand{font-size:clamp(64px,18vw,96px);line-height:1;animation:pop .4s ease}
@@ -299,6 +306,8 @@ table.rt .dl{font-size:11px;color:var(--ng);display:block}
           <li>まちがえると<b>2秒ストップ</b>。2回まちがえると答えが出る</li>
           <li>点が同じなら、合計タイムが速い人の勝ち</li>
           <li>同じ相手に<b>2勝以上勝ちこす</b>と、毎ラウンド<b>+2秒ハンデ</b>（3勝差で+4秒）</li>
+          <li>リアルタイムの「もう1回」は、<b>負けた人が次の問題を選べる</b></li>
+          <li>3回じゃんけんすると、<b>相手のくせ</b>（グー・チョキ・パーを出した割合）が見えるようになる</li>
         </ol>
       </details>
     </section>
@@ -512,7 +521,7 @@ $('makeCh').addEventListener('click', function(){ if(needName()) startGame({kind
 var R=null;   // {code, host, net, peer:{id,nm,m}, cfg, hc:{me,opp}, meReady, peerReady, last}
 function openRoom(code, host){
   closeRoom();
-  R={code:code, host:host, peer:null, cfg:Object.assign({}, REC.cfg), hc:{me:0,opp:0}, meReady:false, peerReady:false, last:Date.now(), full:false};
+  R={code:code, host:host, peer:null, cfg:Object.assign({}, REC.cfg), hc:{me:0,opp:0}, meReady:false, peerReady:false, last:Date.now(), full:false, chooser:'host', why:''};
   R.net=N.join('r'+code, {onMsg:onMsg, onStatus:function(n){ if(R){ R.links=n; renderRoom(); } }});
   R.hello=setInterval(function(){ if(!R) return;
     if(!R.host && !R.peer) R.net.send({t:'hello', nm:me().nm, m:me().m});
@@ -522,7 +531,8 @@ function openRoom(code, host){
   show('room'); renderRoom();
 }
 function closeRoom(){ if(!R) return; try{ if(R.peer) R.net.send({t:'bye'}); }catch(e){} clearInterval(R.hello); var n=R.net; setTimeout(function(){ n.close(); }, 300); R=null; banner(''); }
-function sendRoom(){ if(R && R.host && R.peer) R.net.send({t:'room', peer:R.peer.id, nm:me().nm, m:me().m, cfg:R.cfg, hc:[R.hc.me, R.hc.opp], ready:R.meReady}); }
+function sendRoom(){ if(R && R.host && R.peer) R.net.send({t:'room', peer:R.peer.id, nm:me().nm, m:me().m, cfg:R.cfg, hc:[R.hc.me, R.hc.opp], ready:R.meReady, ch:R.chooser, why:R.why}); }
+function myRole(){ return R && R.host ? 'host' : 'guest'; }
 function plHtml(p, ready, isMe){
   if(!p) return '<small>'+(R.host ? '友だちを待っています…' : 'へやをさがしています…')+'</small>';
   var t=teamOf(p.m);
@@ -538,9 +548,11 @@ function renderRoom(){
   var plMe=$('plMe'), plOpp=$('plOpp'), m=me();
   plMe.style.setProperty('--c', teamOf(m.m).color); plMe.innerHTML=plHtml(m, R.meReady, true); plMe.classList.remove('empty');
   plOpp.style.setProperty('--c', R.peer ? teamOf(R.peer.m).color : 'rgba(255,255,255,.25)'); plOpp.innerHTML=plHtml(R.peer, R.peerReady); plOpp.classList.toggle('empty', !R.peer);
-  var hc=[]; if(R.hc.me) hc.push('あなたに +'+R.hc.me/1000+'秒ハンデ（勝ちこしているから）'); if(R.hc.opp && R.peer) hc.push(R.peer.nm+' に +'+R.hc.opp/1000+'秒ハンデ'); $('roomHc').textContent=hc.join(' ・ ');
-  if(R.host) cfgPicker($('roomCfg'), R.cfg, function(c){ R.cfg={op:c.op,dec:c.dec,lv:c.lv}; REC.cfg=Object.assign({}, R.cfg); saveRec(); sendRoom(); });
-  else { $('roomCfg').onclick=null; $('roomCfg').innerHTML='<span class="status">'+(R.peer?'問題: '+cfgLabel(R.cfg)+'（へやを作った人が決める）':'')+'</span>'; }
+  var hc=[]; if(R.hc.me) hc.push('あなたに +'+R.hc.me/1000+'秒ハンデ（勝ちこしているから）'); if(R.hc.opp && R.peer) hc.push(R.peer.nm+' に +'+R.hc.opp/1000+'秒ハンデ');
+  var mine=R.chooser===myRole();
+  $('roomHc').innerHTML=(R.peer && R.why==='lose' ? '<div class="chooseNote">'+(mine ? '負けたあなたが 次の問題を選べる！ 選んだら「じゅんびOK！」' : '負けた '+esc(R.peer.nm)+' が 次の問題を選んでいます…')+'</div>' : '')+esc(hc.join(' ・ '));
+  if(mine) cfgPicker($('roomCfg'), R.cfg, function(c){ R.cfg={op:c.op,dec:c.dec,lv:c.lv}; REC.cfg=Object.assign({}, R.cfg); saveRec(); if(R.host) sendRoom(); else R.net.send({t:'cfg', cfg:R.cfg}); });
+  else { $('roomCfg').onclick=null; $('roomCfg').innerHTML='<span class="status">'+(R.peer?'問題: '+cfgLabel(R.cfg)+'（'+(R.why==='lose' ? '負けた '+esc(R.peer.nm)+' が決める' : 'へやを作った人が決める')+'）':'')+'</span>'; }
   var rb=$('readyBtn'); rb.disabled=!R.peer; rb.textContent = R.meReady ? (R.peerReady ? 'はじまるよ！' : '相手を待っています…') : 'じゅんびOK！';
   $('roomStamps').innerHTML = R.peer ? stampBtns() : '';
 }
@@ -573,7 +585,9 @@ function onMsg(m){
       var first=!R.peer;
       R.peer={id:m.f, nm:L.cleanName(m.nm), m:String(m.m||'')}; R.cfg=L.cleanCfg(m.cfg); R.full=false;
       R.hc={me:(m.hc&&m.hc[1])|0, opp:(m.hc&&m.hc[0])|0}; R.peerReady=!!m.ready;
+      if(m.ch==='host' || m.ch==='guest'){ R.chooser=m.ch; R.why= m.why==='lose' ? 'lose' : ''; }
       if(first) beep('tick'); if(!G) renderRoom(); break;
+    case 'cfg': if(R.host && R.chooser==='guest' && m.cfg){ var c=L.cleanCfg(m.cfg); R.cfg={op:c.op, dec:c.dec, lv:c.lv}; sendRoom(); if(!G || G.done) renderRoom(); } break;
     case 'full': if(m.to===R.net.id && !R.peer){ R.full=true; renderRoom(); } break;
     case 'ready': R.peerReady=!!m.r; if(!G || G.done) renderRoom(); maybeStart(); break;
     case 'start': if(R.host) return; R.meReady=R.peerReady=false; startGame({kind:'live', cfg:L.cleanCfg(m.cfg), hc:{me:(m.hc[1])|0, opp:(m.hc[0])|0}, opp:{nm:R.peer.nm, m:R.peer.m}}); break;
@@ -615,13 +629,20 @@ function histHtml(){
   var a=[]; for(var r=0;r<G.r;r++) a.push('<span>R'+(r+1)+': あなた '+L.HAND_ICON[G.my.h[r]]+' / '+esc(G.opp.nm)+' '+(G.opd.h[r]?L.HAND_ICON[G.opd.h[r]]:'?')+'</span>');
   return '<div class="hist">'+a.join('')+'</div>';
 }
+/** 相手のじゃんけんのくせ（これまでの試合 ＋ この試合で見えた手） */
+function habitHtml(){
+  if(!G.opp || G.kind==='create') return '';
+  var rv=REC.rivals[L.rivalKey(G.opp.nm)], hb=L.habit(rv && rv.hd, G.opd.h.slice(0, G.r)), nm=esc(G.opp.nm);
+  if(!hb) return '<div class="habit s">'+nm+' のくせは、3回じゃんけんしたら見えるようになる</div>';
+  return '<div class="habit"><b>'+nm+' のくせ</b> <small>（これまで '+hb.n+'回）</small><div class="hb">'+L.HANDS.map(function(h){ return '<span class="'+(hb.top===h?'top':'')+'" style="--w:'+hb.pct[h]+'%">'+L.HAND_ICON[h]+' '+hb.pct[h]+'%</span>'; }).join('')+'</div></div>';
+}
 function jankenPick(){
   var r=G.r, jm=L.jankenMs(G.cfg.op)/1000;
   var lead = G.kind==='create' ? '相手が何を出すか予想して選ぼう（挑戦状に記録される）'
     : '負けたら '+jm+'秒おくれてスタート'+(G.kind==='ghost'?'。相手の手はもう決まっている…':'');
   openOv('<h3>ラウンド '+(r+1)+(r===2&&G.kind!=='create'?' <small style="font-size:.6em;color:var(--ng)">2点！</small>':'')+'</h3><p class="sub2">じゃんけん… '+esc(lead)+'</p>'+
     '<div class="hands" id="hands">'+L.HANDS.map(function(h){ return '<button data-h="'+h+'">'+L.HAND_ICON[h]+'<small>'+L.HAND_NAME[h]+'</small></button>'; }).join('')+'</div>'+
-    '<div class="tbar"><i id="jt"></i></div>'+histHtml()+
+    '<div class="tbar"><i id="jt"></i></div>'+habitHtml()+histHtml()+
     (G.kind==='live'?'<div class="stamps" id="ovStamps">'+stampBtns(true)+'</div>':''));
   bindStamps();
   var t0=Date.now();
@@ -814,7 +835,8 @@ function finish(){
   var key = G.kind==='live' ? null : 'b'+G.ch.id+L.rivalKey(G.opp.nm);
   var rival;
   if(key && REC.seen[key]) rival=REC.rivals[L.rivalKey(G.opp.nm)];
-  else { rival=L.addResult(REC, G.opp.nm, G.opp.m, mt.win==='A'?'win':mt.win?'lose':'draw'); if(key) REC.seen[key]=1; saveRec(); }
+  else { rival=L.addResult(REC, G.opp.nm, G.opp.m, mt.win==='A'?'win':mt.win?'lose':'draw'); L.addHands(REC, G.opp.nm, G.opd.h); if(key) REC.seen[key]=1; saveRec(); }
+  if(G.kind==='live' && R && mt.win){ R.chooser=L.chooserAfter(mt.win, myRole(), R.chooser); R.why='lose'; }
   var replyUrl = G.kind==='ghost' ? BASE+'#r='+L.makeReply(G.ch, my, {a:G.hc.opp, b:G.hc.me}) : '';
   finalView(mt, G.opp, rival, G.kind, replyUrl, key && REC.seen[key] && G.retry);
 }
@@ -831,6 +853,7 @@ function finalView(mt, opp, rival, kind, replyUrl, practice){
     '<table class="rt"><tr><th></th><th>あなた / '+esc(opp.nm)+'</th><th>あなた</th><th>'+esc(opp.nm)+'</th></tr>'+rows+
     '<tr><td>合計</td><td></td><td>'+sec(mt.totalA)+'</td><td>'+sec(mt.totalB)+'</td></tr></table>'+
     (st?'<div class="recl">'+st+(practice?'（2回目からは練習。記録は最初の1回だけ）':'')+'</div>':'')+(hcl.length?'<div class="vline s">'+hcl.join(' ・ ')+'</div>':'')+
+    (kind==='live' && mt.win ? '<div class="vline s chooseNote">'+(win ? '次の問題は '+esc(opp.nm)+' が選ぶ' : '次の問題は あなたが選べる！')+'</div>' : '')+
     (kind==='live'?'<div class="stamps" id="ovStamps">'+stampBtns()+'</div>':'')+
     '<div class="btns">'+
       (kind==='live'?'<button class="btn hot big" id="again">もう1回！</button>':'')+
@@ -839,7 +862,7 @@ function finalView(mt, opp, rival, kind, replyUrl, practice){
       '<button class="btn sub" id="toLobby">ロビーへ</button></div><textarea class="shareBox" rows="3" hidden readonly></textarea>');
   if(win){ beep('win'); confetti([fxColor(),'#ffffff','#ffd84d',fxColor()], 160); }
   bindStamps();
-  if($('again')) $('again').addEventListener('click', function(){ if(!R||!R.peer){ toLobby(); return; } G=null; R.meReady=true; R.net.send({t:'ready', r:true}); closeOv(); show('room'); renderRoom(); maybeStart(); });
+  if($('again')) $('again').addEventListener('click', function(){ if(!R||!R.peer){ toLobby(); return; } G=null; var pick=R.why==='lose' && R.chooser===myRole(); R.meReady=!pick; if(!pick) R.net.send({t:'ready', r:true}); closeOv(); show('room'); renderRoom(); maybeStart(); });   // 負けた人は問題を選んでから じゅんびOK
   if($('sendReply')) $('sendReply').addEventListener('click', function(){ share(replyUrl, me().nm+'から 挑戦状の返事！ '+(win?'勝ったよ！':'次は負けない！')); });
   if($('retry')) $('retry').addEventListener('click', function(){ var c=G.ch; startGhost(c, true); });
   if($('revenge')) $('revenge').addEventListener('click', function(){ if(mt.cfg) REC.cfg={op:mt.cfg.op, dec:mt.cfg.dec, lv:mt.cfg.lv}; saveRec(); toLobby(); $('makeCh').click(); });
@@ -873,7 +896,7 @@ function openReply(rp){
   var mt=L.match(rp.a, rp.b, {op:rp.c.op, hcA:rp.hc.a, hcB:rp.hc.b}); mt.cfg=rp.c;
   var key='a'+rp.id+L.rivalKey(rp.b.nm), rival;
   if(REC.seen[key]) rival=REC.rivals[L.rivalKey(rp.b.nm)];
-  else { rival=L.addResult(REC, rp.b.nm, rp.b.m, mt.win==='A'?'win':mt.win?'lose':'draw'); REC.seen[key]=1; saveRec(); }
+  else { rival=L.addResult(REC, rp.b.nm, rp.b.m, mt.win==='A'?'win':mt.win?'lose':'draw'); L.addHands(REC, rp.b.nm, rp.b.h); REC.seen[key]=1; saveRec(); }
   renderLobby();
   document.documentElement.style.setProperty('--me', teamOf(rp.a.m).color); document.documentElement.style.setProperty('--opp', teamOf(rp.b.m).color);
   finalView(mt, {nm:rp.b.nm, m:rp.b.m}, rival, 'reply', '', false);
@@ -1136,7 +1159,7 @@ document.addEventListener('keydown', function(ev){
 
 // ---------- 起動 ----------
 window.addEventListener('pagehide', function(){ if(R && R.peer) try{ R.net.send({t:'bye'}); }catch(e){} });
-window.BATTLE={ answers:function(){ return S.steps.map(stepAnswer); }, next:function(){ var s=cur(); return s?stepAnswer(s):null; }, phase:function(){ return G ? {phase:G.phase||'', r:G.r, playing:S.playing, busy:S.busy, done:G.done} : null; }, state:function(){ return {G:G, R:R && {code:R.code, peer:R.peer, links:R.links}, playing:S.playing, busy:S.busy}; }, hand:function(h){ choose(h); } };
+window.BATTLE={ answers:function(){ return S.steps.map(stepAnswer); }, next:function(){ var s=cur(); return s?stepAnswer(s):null; }, phase:function(){ return G ? {phase:G.phase||'', r:G.r, playing:S.playing, busy:S.busy, done:G.done} : null; }, state:function(){ return {G:G, R:R && {code:R.code, peer:R.peer, links:R.links, meReady:R.meReady, peerReady:R.peerReady, chooser:R.chooser}, playing:S.playing, busy:S.busy}; }, hand:function(h){ choose(h); } };
 $('soundBtn').setAttribute('aria-pressed', String(REC.sound));
 buildPad(); renderLobby(); show('lobby');
 /** 前のルール（1ラウンド3問）のリンクは使えないことを伝える */
